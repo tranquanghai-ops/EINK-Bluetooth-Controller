@@ -100,9 +100,7 @@
                 <select id="week-start"><option value="1">Thứ Hai</option><option value="0">Chủ nhật</option></select>
               </label>
               <button class="setting-row setting-action" id="refresh-button" type="button"><span><strong>Làm mới màn hình</strong><small>Gửi lại lệnh refresh phù hợp</small></span><b>↻</b></button>
-              <button class="setting-row setting-action da-only" id="toggle-color-button" type="button"><span><strong>Đổi màu đồng hồ</strong><small>Chuyển cách dùng màu đỏ/đen</small></span><b>›</b></button>
-              <button class="setting-row setting-action da-only" id="invert-button" type="button"><span><strong>Đảo màu đen–trắng</strong><small>Gửi lệnh E3</small></span><b>›</b></button>
-              <button class="setting-row setting-action da-only" id="rotate-device-button" type="button"><span><strong>Xoay màn hình 180°</strong><small>Gửi lệnh E5</small></span><b>›</b></button>
+              <div class="compatibility-note da-only"><strong>Firmware Legacy giới hạn</strong><small>Các lệnh đổi màu, đảo màu và xoay E3/E4/E5 không được log thiết bị xác nhận nên đã chuyển xuống mục thử nghiệm.</small></div>
             </div>
           </article>
         </div>
@@ -113,6 +111,15 @@
           </button>
           <div class="advanced-content" id="advanced-content" hidden>
             <div class="advanced-grid">
+              <div class="advanced-section experimental-section">
+                <h4>Lệnh thử nghiệm E3 / E4 / E5</h4>
+                <p>Chỉ thử khi bạn chấp nhận thiết bị có thể không phản hồi. Các lệnh này không ghi firmware.</p>
+                <div class="experimental-actions">
+                  <button class="button button-ghost" id="toggle-color-button" type="button">E4 · Đổi màu</button>
+                  <button class="button button-ghost" id="invert-button" type="button">E3 · Đảo màu</button>
+                  <button class="button button-ghost" id="rotate-device-button" type="button">E5 · Xoay 180°</button>
+                </div>
+              </div>
               <div class="advanced-section">
                 <h4>Hiệu chỉnh làm mới cục bộ</h4>
                 <p>Chỉ thay đổi khi màu đỏ hoặc đen quá nhạt. Mỗi lần nên điều chỉnh một mức và kiểm tra lại.</p>
@@ -177,7 +184,30 @@
       <section class="tab-panel" id="log-panel">
         <div class="section-heading">
           <div><p class="eyebrow">NHẬT KÝ KẾT NỐI</p><h2>Thông tin chẩn đoán</h2></div>
-          <button class="button button-ghost" id="clear-log-button" type="button">Xóa nhật ký</button>
+          <div class="heading-actions">
+            <button class="button button-secondary" id="export-log-button" type="button">Xuất chẩn đoán</button>
+            <button class="button button-ghost" id="clear-log-button" type="button">Xóa nhật ký</button>
+          </div>
+        </div>
+        <div class="diagnostic-grid">
+          <article class="panel-card diagnostic-card">
+            <div class="card-heading"><div class="card-icon">◎</div><div><h3>Khả năng đã nhận diện</h3><p>Đọc trực tiếp từ GATT, không gửi lệnh thay đổi thiết bị.</p></div></div>
+            <dl class="diagnostic-list">
+              <div><dt>Giao thức</dt><dd id="diag-protocol">Chưa xác định</dd></div>
+              <div><dt>Firmware</dt><dd id="diag-firmware">Chưa đọc</dd></div>
+              <div><dt>Truyền ảnh</dt><dd id="diag-image">Chưa xác định</dd></div>
+              <div><dt>Bluetooth services</dt><dd id="diag-services">Chưa quét</dd></div>
+            </dl>
+          </article>
+          <article class="panel-card diagnostic-card" id="firmware-card" hidden>
+            <div class="card-heading"><div class="card-icon">↓</div><div><h3>Sao lưu firmware qua Bluetooth</h3><p>Chỉ hiện khi có đúng dịch vụ Telink 0x221F/0x331F.</p></div></div>
+            <div class="firmware-warning">Chức năng này chỉ đọc vùng 0x20000–0x3FFFF, không xóa và không ghi Flash. Không ngắt Bluetooth trong lúc sao lưu.</div>
+            <p id="firmware-status">Hãy kiểm tra đọc trước.</p>
+            <div class="firmware-actions">
+              <button class="button button-secondary" id="firmware-test-button" type="button">1 · Kiểm tra đọc</button>
+              <button class="button button-primary" id="firmware-backup-button" type="button" disabled>2 · Tải bản sao .bin</button>
+            </div>
+          </article>
         </div>
         <div class="log-console" id="log-console" role="log" aria-live="polite"></div>
       </section>
