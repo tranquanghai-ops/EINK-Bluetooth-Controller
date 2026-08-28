@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101820">
+  <meta name="description" content="Điều khiển màn hình E-Ink 2.13 inch qua Bluetooth, hỗ trợ DA14585 và nRF52.">
+  <title>E-Ink Bluetooth Controller</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div>
+        <h1>E-Ink Controller</h1>
+        <p>Điều khiển Bluetooth cho DA14585 và nRF52</p>
+      </div>
+    </div>
+    <div class="header-chip">Xử lý cục bộ · Không tải ảnh lên mạng</div>
+  </header>
+
+  <main class="app-shell">
+    <section class="connection-card" aria-labelledby="connection-title">
+      <div class="connection-main">
+        <div class="connection-icon" id="connection-icon" aria-hidden="true">⌁</div>
+        <div class="connection-copy">
+          <p class="eyebrow">TRẠNG THÁI THIẾT BỊ</p>
+          <h2 id="connection-title">Chưa kết nối</h2>
+          <p id="connection-description">Bật Bluetooth trên màn hình, sau đó chọn đúng thiết bị trong danh sách.</p>
+          <div class="device-badges" id="device-badges" hidden>
+            <span class="badge badge-primary" id="protocol-badge">—</span>
+            <span class="badge" id="model-badge">—</span>
+            <span class="badge" id="mode-badge">—</span>
+            <span class="badge" id="mtu-badge" hidden>—</span>
+          </div>
+        </div>
+      </div>
+      <div class="connection-actions">
+        <button class="button button-primary" id="connect-button" type="button">
+          <span aria-hidden="true">⌁</span> Quét và kết nối
+        </button>
+        <button class="button button-secondary" id="reconnect-button" type="button" hidden>Kết nối lại</button>
+        <button class="button button-ghost" id="disconnect-button" type="button" hidden>Ngắt kết nối</button>
+      </div>
+    </section>
+
+    <section class="support-note" id="browser-warning" hidden role="alert">
+      <strong>Trình duyệt chưa hỗ trợ Web Bluetooth.</strong>
+      Hãy mở trang bằng Chrome hoặc Edge trên máy tính/Android và sử dụng kết nối HTTPS.
+    </section>
+
+    <section class="welcome-panel" id="welcome-panel">
+      <div class="welcome-copy">
+        <p class="eyebrow">BẮT ĐẦU NHANH</p>
+        <h2>Một giao diện, tự nhận diện hai dòng thiết bị</h2>
+        <p>Sau khi kết nối, hệ thống đọc Bluetooth service và log phản hồi để xác định đúng phần cứng. Những lệnh không tương thích sẽ tự động được ẩn.</p>
+      </div>
+      <ol class="steps">
+        <li><span>1</span><div><strong>Bật thiết bị</strong><small>Đặt màn hình gần máy tính.</small></div></li>
+        <li><span>2</span><div><strong>Quét Bluetooth</strong><small>Chọn tên màn hình trong danh sách.</small></div></li>
+        <li><span>3</span><div><strong>Sử dụng</strong><small>Chỉ nút phù hợp sẽ xuất hiện.</small></div></li>
+      </ol>
+    </section>
+
+    <div class="workspace" id="workspace" hidden>
+      <nav class="tab-list" aria-label="Khu vực điều khiển">
+        <button class="tab active" type="button" data-tab="control-panel">Điều khiển</button>
+        <button class="tab" type="button" data-tab="image-panel">Truyền ảnh</button>
+        <button class="tab" type="button" data-tab="log-panel">Nhật ký <span class="tab-count" id="log-count">0</span></button>
+      </nav>
+
+      <section class="tab-panel active" id="control-panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">ĐIỀU KHIỂN NHANH</p><h2>Chế độ hiển thị</h2></div>
+          <button class="button button-secondary" id="sync-time-button" type="button">Đồng bộ ngày giờ</button>
+        </div>
+
+        <div class="control-grid">
+          <article class="panel-card">
+            <div class="card-heading"><div class="card-icon">◫</div><div><h3>Giao diện màn hình</h3><p>Chọn chế độ muốn hiển thị.</p></div></div>
+            <div class="mode-grid" id="nrf-mode-controls" hidden>
+              <button class="mode-button" type="button" data-nrf-mode="1"><span>▦</span><strong>Lịch</strong><small>Tháng và đồng hồ</small></button>
+              <button class="mode-button" type="button" data-nrf-mode="2"><span>◷</span><strong>Đồng hồ 1</strong><small>Mặt số thứ nhất</small></button>
+              <button class="mode-button" type="button" data-nrf-mode="3"><span>◴</span><strong>Đồng hồ 2</strong><small>Mặt số thứ hai</small></button>
+              <button class="mode-button open-image" type="button"><span>▧</span><strong>Ảnh riêng</strong><small>Tải ảnh 250×128</small></button>
+            </div>
+            <div class="mode-grid" id="da-mode-controls" hidden>
+              <button class="mode-button" type="button" data-da-command="e101"><span>▦</span><strong>Lịch</strong><small>Chế độ lịch</small></button>
+              <button class="mode-button" type="button" data-da-command="e102"><span>◷</span><strong>Đồng hồ</strong><small>Chế độ đồng hồ</small></button>
+              <button class="mode-button" type="button" data-da-direct="e100"><span>▧</span><strong>Ảnh riêng</strong><small>Khôi phục ảnh</small></button>
+            </div>
+          </article>
+
+          <article class="panel-card">
+            <div class="card-heading"><div class="card-icon">◐</div><div><h3>Thiết lập cơ bản</h3><p>Các lệnh an toàn cho thiết bị.</p></div></div>
+            <div class="setting-list">
+              <label class="setting-row" id="week-start-row" hidden>
+                <span><strong>Ngày đầu tuần</strong><small>Áp dụng cho chế độ lịch nRF52</small></span>
+                <select id="week-start"><option value="1">Thứ Hai</option><option value="0">Chủ nhật</option></select>
+              </label>
+              <button class="setting-row setting-action" id="refresh-button" type="button"><span><strong>Làm mới màn hình</strong><small>Gửi lại lệnh refresh phù hợp</small></span><b>↻</b></button>
+              <button class="setting-row setting-action da-only" id="toggle-color-button" type="button"><span><strong>Đổi màu đồng hồ</strong><small>Chuyển cách dùng màu đỏ/đen</small></span><b>›</b></button>
+              <button class="setting-row setting-action da-only" id="invert-button" type="button"><span><strong>Đảo màu đen–trắng</strong><small>Gửi lệnh E3</small></span><b>›</b></button>
+              <button class="setting-row setting-action da-only" id="rotate-device-button" type="button"><span><strong>Xoay màn hình 180°</strong><small>Gửi lệnh E5</small></span><b>›</b></button>
+            </div>
+          </article>
+        </div>
+
+        <article class="panel-card advanced-card da-only" id="da-advanced">
+          <button class="advanced-toggle" id="advanced-toggle" type="button" aria-expanded="false">
+            <span><strong>Cài đặt nâng cao cho DA14585</strong><small>Hiệu chỉnh độ đậm và thời gian ngừng cập nhật</small></span><b>⌄</b>
+          </button>
+          <div class="advanced-content" id="advanced-content" hidden>
+            <div class="advanced-grid">
+              <div class="advanced-section">
+                <h4>Hiệu chỉnh làm mới cục bộ</h4>
+                <p>Chỉ thay đổi khi màu đỏ hoặc đen quá nhạt. Mỗi lần nên điều chỉnh một mức và kiểm tra lại.</p>
+                <div class="field-row">
+                  <label>Giá trị HEX<input id="calibration-value" type="text" inputmode="text" maxlength="2" placeholder="01–F0" autocomplete="off"></label>
+                  <button class="button button-danger" id="calibrate-button" type="button" disabled>Gửi hiệu chỉnh</button>
+                </div>
+                <p class="field-help" id="calibration-help">Màu đỏ: 01–0F · Màu đen: 10–F0.</p>
+              </div>
+              <div class="advanced-section">
+                <h4>Giờ ngừng cập nhật</h4>
+                <p>Trong khoảng nghỉ, màn hình giữ nội dung và hạn chế refresh.</p>
+                <div class="field-row time-row">
+                  <label>Giờ<input id="sleep-hour" type="number" min="0" max="23" value="0"></label>
+                  <label>Phút<input id="sleep-minute" type="number" min="0" max="59" value="0"></label>
+                  <button class="button button-secondary" id="sleep-on-button" type="button">Bật</button>
+                  <button class="button button-ghost" id="sleep-off-button" type="button">Tắt</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="tab-panel" id="image-panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">TRUYỀN ẢNH CỤC BỘ</p><h2>Chuẩn bị ảnh cho màn hình 250 × 128</h2></div>
+          <span class="device-ready" id="image-device-label">Thiết bị đã sẵn sàng</span>
+        </div>
+        <div class="image-workspace">
+          <div class="image-tools">
+            <label class="drop-zone" id="drop-zone" for="image-file">
+              <input id="image-file" type="file" accept="image/png,image/jpeg,image/webp,image/bmp" hidden>
+              <span class="drop-icon">＋</span><strong>Chọn hoặc kéo ảnh vào đây</strong><small>PNG, JPG, WEBP hoặc BMP</small>
+            </label>
+            <div class="tool-section">
+              <h3>Căn ảnh</h3>
+              <div class="segmented"><button type="button" data-fit="contain" class="active">Vừa khung</button><button type="button" data-fit="cover">Lấp đầy</button><button type="button" id="rotate-image-button">Xoay 90°</button></div>
+            </div>
+            <div class="tool-section range-fields">
+              <label><span>Độ sáng <output id="brightness-output">0</output></span><input id="brightness" type="range" min="-100" max="100" value="0"></label>
+              <label><span>Tương phản <output id="contrast-output">100</output></span><input id="contrast" type="range" min="50" max="180" value="100"></label>
+            </div>
+            <div class="tool-section">
+              <label class="select-label">Xử lý màu<select id="dither-mode"><option value="floyd">Ba màu · Floyd–Steinberg</option><option value="nearest">Ba màu · Sắc nét</option><option value="bw">Đen trắng</option></select></label>
+            </div>
+          </div>
+
+          <div class="preview-card">
+            <div class="preview-top"><span>XEM TRƯỚC E-INK</span><span id="preview-info">250 × 128 px</span></div>
+            <div class="screen-frame"><canvas id="preview-canvas" width="250" height="128" aria-label="Xem trước ảnh e-ink"></canvas></div>
+            <div class="palette-legend"><span><i class="white"></i>Trắng</span><span><i class="black"></i>Đen</span><span><i class="red"></i>Đỏ</span></div>
+            <div class="upload-area">
+              <button class="button button-primary button-large" id="upload-button" type="button" disabled>Truyền ảnh lên màn hình</button>
+              <progress id="upload-progress" max="100" value="0"></progress>
+              <p id="upload-status">Chọn ảnh để bắt đầu.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-panel" id="log-panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">NHẬT KÝ KẾT NỐI</p><h2>Thông tin chẩn đoán</h2></div>
+          <button class="button button-ghost" id="clear-log-button" type="button">Xóa nhật ký</button>
+        </div>
+        <div class="log-console" id="log-console" role="log" aria-live="polite"></div>
+      </section>
+    </div>
+
+    <section class="recent-log" id="recent-log" hidden>
+      <div><span class="pulse"></span><strong>Hoạt động gần nhất</strong></div>
+      <ol id="recent-log-list"></ol>
+      <button type="button" id="open-log-button">Xem đầy đủ</button>
+    </section>
+  </main>
+
+  <div class="toast-region" id="toast-region" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
