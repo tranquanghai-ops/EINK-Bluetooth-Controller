@@ -4,19 +4,23 @@ const PROTOCOL = { NRF52: "nrf52", DA14585: "da14585" };
 const UUID = {
   NRF_SERVICE: "62750001-d828-918d-fb46-b6c11c675aec",
   NRF_CHARACTERISTIC: "62750002-d828-918d-fb46-b6c11c675aec",
+  NRF_VERSION_CHARACTERISTIC: "62750003-d828-918d-fb46-b6c11c675aec",
   DA_SERIAL_SERVICE: "00001f10-0000-1000-8000-00805f9b34fb",
   DA_SERIAL_CHARACTERISTIC: "00001f1f-0000-1000-8000-00805f9b34fb",
   DA_LEGACY_SERVICE: "13187b10-eba9-a3ba-044e-83d3217d9a38",
   DA_LEGACY_CHARACTERISTIC: "4b646063-6264-f3a7-8941-e65356ea82fe",
-  DA_DFU_SERVICE: "0000221f-0000-1000-8000-00805f9b34fb"
+  DA_DFU_SERVICE: "0000221f-0000-1000-8000-00805f9b34fb",
+  DA_DFU_CHARACTERISTIC: "0000331f-0000-1000-8000-00805f9b34fb"
 };
-const NRF_CMD = { INIT: 0x01, REFRESH: 0x05, SET_TIME: 0x20, WEEK_START: 0x21, WRITE_IMAGE: 0x30 };
+const NRF_CMD = { INIT: 0x01, CLEAR: 0x02, REFRESH: 0x05, SLEEP: 0x06, SET_TIME: 0x20, WEEK_START: 0x21, WRITE_IMAGE: 0x30 };
 const OPTIONAL_SERVICES = [UUID.NRF_SERVICE, UUID.DA_SERIAL_SERVICE, UUID.DA_LEGACY_SERVICE, UUID.DA_DFU_SERVICE];
 
 const state = {
   device: null, server: null, protocol: null, epd: null, serial: null,
   model: null, mode: null, mtu: null, chunkSize: 128, logs: [],
-  image: null, rotation: 0, fit: "contain", imageReady: false, sending: false
+  image: null, rotation: 0, fit: "contain", imageReady: false, sending: false,
+  firmwareVersion: null, serviceUuids: [], characteristicUuids: [], dfu: null,
+  dfuPending: null, firmwareReadVerified: false, backupRunning: false
 };
 
 const $ = (id) => document.getElementById(id);
@@ -102,6 +106,161 @@ function updateDeviceUI() {
   document.querySelectorAll(".da-only").forEach((element) => { element.hidden = isNrf; });
   $("image-device-label").textContent = isNrf ? `nRF52 model ${state.model ?? 2}` : "DA14585 Legacy";
   document.querySelectorAll("[data-nrf-mode]").forEach((button) => button.classList.toggle("active", Number(button.dataset.nrfMode) === state.mode));
+  updateDiagnosticsUI();
+}
+
+function shortUuid(uuid) {
+  const match = String(uuid).toLowerCase().match(/^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/);
+  return match ? `0x${match[1].toUpperCase()}` : String(uuid);
+}
+
+function updateDiagnosticsUI() {
+  const isNrf = state.protocol === PROTOCOL.NRF52;
+  $("diag-protocol").textContent = state.protocol ? (isNrf ? "nRF52 / EPD-nRF5" : "Legacy serial + E-paper") : "Chưa xác định";
+  $("diag-firmware").textContent = state.firmwareVersion || (isNrf ? "Firmware không cung cấp version" : "Không có characteristic version");
+  $("diag-services").textContent = state.serviceUuids.length ? state.serviceUuids.map(shortUuid).join(" · ") : "Chưa quét";
+  $("diag-image").textContent = state.protocol ? (isNrf ? `0x30 · chunk ${state.chunkSize} byte` : "Legacy 0x03 · gói 244 byte · lớp BW") : "Chưa xác định";
+  $("firmware-card").hidden = !state.dfu;
+  $("firmware-status").textContent = state.dfu
+    ? (state.firmwareReadVerified ? "Đã xác minh đọc Flash. Có thể tạo bản sao .bin." : "Đã thấy dịch vụ Telink OTA. Hãy kiểm tra đọc trước.")
+    : "Thiết bị không công bố dịch vụ đọc Flash 0x221F/0x331F.";
+  $("firmware-backup-button").disabled = !state.firmwareReadVerified || state.backupRunning;
+}
+
+async function inspectGattCapabilities() {
+  state.serviceUuids = []; state.characteristicUuids = []; state.dfu = null;
+  state.firmwareReadVerified = false;
+  try {
+    const services = await state.server.getPrimaryServices();
+    for (const service of services) {
+      state.serviceUuids.push(service.uuid);
+      addLog(`GATT service: ${service.uuid}`);
+      try {
+        const characteristics = await service.getCharacteristics();
+        for (const characteristic of characteristics) {
+          state.characteristicUuids.push(characteristic.uuid);
+          addLog(`  characteristic: ${characteristic.uuid}`);
+        }
+      } catch (error) {
+        addLog(`Không đọc được danh sách characteristic của ${shortUuid(service.uuid)}: ${error.message}`);
+      }
+    }
+  } catch (error) {
+    addLog(`Không thể liệt kê toàn bộ GATT: ${error.message}`);
+  }
+  try {
+    const service = await state.server.getPrimaryService(UUID.DA_DFU_SERVICE);
+    state.dfu = await service.getCharacteristic(UUID.DA_DFU_CHARACTERISTIC);
+    await state.dfu.startNotifications();
+    state.dfu.addEventListener("characteristicvaluechanged", handleDfuNotification);
+    addLog("Đã phát hiện kênh Telink đọc Flash 0x221F/0x331F.", "success");
+  } catch (error) {
+    state.dfu = null;
+    addLog("Không có kênh đọc Flash tương thích; chức năng sao lưu được ẩn.");
+  }
+  updateDiagnosticsUI();
+}
+
+async function readNrfVersion(service) {
+  try {
+    const characteristic = await service.getCharacteristic(UUID.NRF_VERSION_CHARACTERISTIC);
+    const value = await characteristic.readValue();
+    const data = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    const printable = new TextDecoder().decode(data).replace(/\0/g, "").trim();
+    state.firmwareVersion = printable && /^[\x20-\x7e]+$/.test(printable) ? printable : bytesHex(data);
+    addLog(`nRF52 firmware: ${state.firmwareVersion}`, "success");
+  } catch (error) {
+    state.firmwareVersion = null;
+    addLog("nRF52 không cung cấp characteristic version.");
+  }
+}
+
+function handleDfuNotification(event) {
+  const view = event.target.value;
+  const data = new Uint8Array(view.buffer, view.byteOffset, view.byteLength).slice();
+  addLog(`Flash response: ${data.length} byte · ${bytesHex(data.slice(0, 12))}${data.length > 12 ? "…" : ""}`);
+  if (state.dfuPending) {
+    const pending = state.dfuPending; state.dfuPending = null;
+    clearTimeout(pending.timer); pending.resolve(data);
+  }
+}
+
+async function requestFlashBlock(address, timeout = 2500) {
+  if (!state.dfu) throw new Error("Không có kênh đọc Flash tương thích.");
+  if (state.dfuPending) throw new Error("Đang chờ phản hồi đọc Flash trước đó.");
+  const response = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { state.dfuPending = null; reject(new Error("Thiết bị không phản hồi lệnh đọc Flash.")); }, timeout);
+    state.dfuPending = { resolve, reject, timer };
+  });
+  const command = new Uint8Array([0x04, address >>> 24, address >>> 16, address >>> 8, address]);
+  try {
+    if (state.dfu.writeValueWithoutResponse) await state.dfu.writeValueWithoutResponse(command);
+    else await state.dfu.writeValue(command);
+  } catch (error) {
+    if (state.dfuPending) { clearTimeout(state.dfuPending.timer); state.dfuPending = null; }
+    throw error;
+  }
+  return response;
+}
+
+async function testFirmwareRead() {
+  $("firmware-test-button").disabled = true;
+  try {
+    addLog("Kiểm tra chỉ đọc Flash tại 0x00020000…", "command");
+    const data = await requestFlashBlock(0x20000);
+    if (!data.length) throw new Error("Phản hồi rỗng.");
+    state.firmwareReadVerified = true;
+    addLog(`Đọc Flash thành công: ${data.length} byte. Không có dữ liệu nào được ghi.`, "success");
+    toast("Đã xác minh khả năng đọc firmware.");
+  } catch (error) {
+    state.firmwareReadVerified = false; commandError(error);
+  } finally {
+    $("firmware-test-button").disabled = false; updateDiagnosticsUI();
+  }
+}
+
+async function backupFirmware() {
+  if (!state.firmwareReadVerified || state.backupRunning) return;
+  state.backupRunning = true; updateDiagnosticsUI();
+  const start = 0x20000, end = 0x40000, chunks = [];
+  let address = start;
+  try {
+    addLog("Bắt đầu sao lưu vùng firmware 0x20000–0x3FFFF (chỉ đọc).", "command");
+    while (address < end) {
+      const data = await requestFlashBlock(address, 4000);
+      if (!data.length) throw new Error(`Phản hồi rỗng tại 0x${address.toString(16)}.`);
+      const usable = data.slice(0, Math.min(data.length, end - address));
+      chunks.push(usable); address += usable.length;
+      const percent = Math.floor(((address - start) / (end - start)) * 100);
+      $("firmware-status").textContent = `Đang sao lưu: ${percent}% · 0x${address.toString(16).toUpperCase()}`;
+      if ((chunks.length % 64) === 0) await delay(20);
+    }
+    const blob = new Blob(chunks, { type: "application/octet-stream" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${(state.device?.name || "eink").replace(/[^a-z0-9_-]+/gi, "_")}_0x20000_0x3ffff.bin`;
+    link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    addLog(`Đã sao lưu ${blob.size} byte firmware.`, "success"); toast("Đã tải bản sao firmware .bin.");
+  } catch (error) {
+    commandError(error);
+  } finally {
+    state.backupRunning = false; updateDiagnosticsUI();
+  }
+}
+
+function exportDiagnostics() {
+  const payload = {
+    exportedAt: new Date().toISOString(), device: state.device?.name || null,
+    protocol: state.protocol, model: state.model, mode: state.mode, mtu: state.mtu,
+    firmwareVersion: state.firmwareVersion, services: state.serviceUuids,
+    characteristics: state.characteristicUuids,
+    telinkFlashReadService: Boolean(state.dfu), firmwareReadVerified: state.firmwareReadVerified,
+    logs: state.logs.map((item) => ({ time: item.time.toISOString(), type: item.type, message: item.message }))
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
+  link.download = `eink-diagnostic-${Date.now()}.json`; link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 }
 
 async function writeEpd(bytes, withResponse = true) {
@@ -129,6 +288,7 @@ async function connectSelectedDevice(reuse = false) {
     addLog(`Đang kết nối: ${state.device.name || "Thiết bị không tên"}`);
     state.server = await state.device.gatt.connect();
     addLog("Đã tìm thấy GATT server", "success");
+    await inspectGattCapabilities();
     await detectProtocol();
     updateDeviceUI();
     toast(`Đã kết nối ${state.protocol === PROTOCOL.NRF52 ? "nRF52" : "DA14585"}`);
@@ -143,13 +303,14 @@ async function connectSelectedDevice(reuse = false) {
 }
 
 async function detectProtocol() {
-  state.protocol = null; state.epd = null; state.serial = null; state.model = null; state.mode = null; state.mtu = null; state.chunkSize = 128;
+  state.protocol = null; state.epd = null; state.serial = null; state.model = null; state.mode = null; state.mtu = null; state.chunkSize = 128; state.firmwareVersion = null;
   try {
     const service = await state.server.getPrimaryService(UUID.NRF_SERVICE);
     state.epd = await service.getCharacteristic(UUID.NRF_CHARACTERISTIC);
     await state.epd.startNotifications();
     state.epd.addEventListener("characteristicvaluechanged", handleNrfNotification);
     state.protocol = PROTOCOL.NRF52;
+    await readNrfVersion(service);
     addLog("Đã nhận dạng giao thức: nRF52", "success");
     await writeEpd(new Uint8Array([NRF_CMD.INIT]));
     addLog("nRF52 connected; display initialized.", "success");
@@ -207,8 +368,9 @@ function handleDisconnect() {
 }
 
 function resetConnection(keepDevice = true) {
-  state.server = null; state.protocol = null; state.epd = null; state.serial = null;
-  state.model = null; state.mode = null; state.mtu = null;
+  state.server = null; state.protocol = null; state.epd = null; state.serial = null; state.dfu = null;
+  state.model = null; state.mode = null; state.mtu = null; state.firmwareVersion = null;
+  state.serviceUuids = []; state.characteristicUuids = []; state.firmwareReadVerified = false;
   if (!keepDevice) state.device = null;
   updateDeviceUI();
 }
@@ -354,6 +516,12 @@ function canvasBytesColumnMajor(type="black") {
   for(let x=249;x>=0;x--) for(let y=0;y<128;y++){const i=(y*250+x)*4;const red=data[i]>180&&data[i+1]<80;const black=data[i]<80&&data[i+1]<80&&data[i+2]<80;bits.push(type==="red"?(red?0:1):(black?0:1));if(bits.length===8){result.push(parseInt(bits.join(""),2));bits=[];}}
   return new Uint8Array(result);
 }
+function canvasBytesLegacy() {
+  const data=ctx.getImageData(0,0,250,128).data,result=[];let bits=[];
+  // Mã hóa đúng như công cụ gốc cho màn 250×128: trắng=1, đen hoặc đỏ=0.
+  for(let x=249;x>=0;x--) for(let y=0;y<128;y++){const i=(y*250+x)*4;const white=data[i]>0&&data[i+1]>0&&data[i+2]>0;bits.push(white?1:0);if(bits.length===8){result.push(parseInt(bits.join(""),2));bits=[];}}
+  return new Uint8Array(result);
+}
 
 function uploadProgress(value,text){$("upload-progress").value=value;$("upload-status").textContent=text;}
 async function uploadImage() {
@@ -372,9 +540,15 @@ async function uploadNrfImage() {
   uploadProgress(97,"Đang làm mới màn hình…");await writeEpd(new Uint8Array([NRF_CMD.REFRESH]));state.mode=0;updateDeviceUI();
 }
 async function uploadDaImage() {
-  const data=canvasBytesColumnMajor("black"),hex=bytesHex(data),step=480,total=Math.ceil(hex.length/step);let part=0;
-  for(let offset=0;offset<hex.length;offset+=step){const packet=`03ff${toHex(offset/2,2)}${hex.slice(offset,offset+step)}`;await writeEpd(hexBytes(packet));part++;uploadProgress((part/total)*94,`Đang gửi khối ${part}/${total}`);}
-  await delay(300);await writeEpd(hexBytes("01"));
+  const data=canvasBytesLegacy(),hex=bytesHex(data),step=480,total=Math.ceil(hex.length/step);let part=0;
+  addLog(`Legacy image: ${data.length} byte · ${total} khối · header 03FF`);
+  for(let offset=0;offset<hex.length;offset+=step){
+    const packet=`03ff${toHex(offset/2,2)}${hex.slice(offset,offset+step)}`;
+    await writeEpd(hexBytes(packet)); part++;
+    uploadProgress((part/total)*94,`Đang gửi khối ${part}/${total} · offset ${offset/2}`);
+    await delay(12);
+  }
+  await delay(300); await writeEpd(hexBytes("01"));
 }
 
 function bindEvents() {
@@ -393,6 +567,9 @@ function bindEvents() {
   document.querySelectorAll(".tab").forEach((tab)=>tab.addEventListener("click",()=>showTab(tab.dataset.tab)));
   $("open-log-button").addEventListener("click",()=>showTab("log-panel"));
   $("clear-log-button").addEventListener("click",()=>{state.logs=[];renderLogs();});
+  $("export-log-button").addEventListener("click",exportDiagnostics);
+  $("firmware-test-button").addEventListener("click",testFirmwareRead);
+  $("firmware-backup-button").addEventListener("click",backupFirmware);
   $("advanced-toggle").addEventListener("click",()=>{const open=$("advanced-content").hidden;$("advanced-content").hidden=!open;$("advanced-toggle").setAttribute("aria-expanded",String(open));});
   $("calibration-value").addEventListener("input",validateCalibration);$("calibrate-button").addEventListener("click",calibrateDa);
   $("sleep-on-button").addEventListener("click",()=>setSleep(true));$("sleep-off-button").addEventListener("click",()=>setSleep(false));
