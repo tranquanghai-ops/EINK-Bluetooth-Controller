@@ -349,9 +349,9 @@ function canvasBytesRowMajor(type="black") {
   for(let y=0;y<128;y++) for(let x=0;x<250;x++) { const i=(y*250+x)*4; const red=data[i]>180&&data[i+1]<80; const black=data[i]<80&&data[i+1]<80&&data[i+2]<80; bits.push(type==="red" ? (red?0:1) : (black?0:1)); if(bits.length===8){result.push(parseInt(bits.join(""),2));bits=[];} }
   if(bits.length){while(bits.length<8)bits.push(1);result.push(parseInt(bits.join(""),2));} return new Uint8Array(result);
 }
-function canvasBytesColumnMajor() {
+function canvasBytesColumnMajor(type="black") {
   const data=ctx.getImageData(0,0,250,128).data,result=[];let bits=[];
-  for(let x=249;x>=0;x--) for(let y=0;y<128;y++){const i=(y*250+x)*4;const white=data[i]>0&&data[i+1]>0&&data[i+2]>0;bits.push(white?1:0);if(bits.length===8){result.push(parseInt(bits.join(""),2));bits=[];}}
+  for(let x=249;x>=0;x--) for(let y=0;y<128;y++){const i=(y*250+x)*4;const red=data[i]>180&&data[i+1]<80;const black=data[i]<80&&data[i+1]<80&&data[i+2]<80;bits.push(type==="red"?(red?0:1):(black?0:1));if(bits.length===8){result.push(parseInt(bits.join(""),2));bits=[];}}
   return new Uint8Array(result);
 }
 
@@ -366,12 +366,13 @@ async function uploadImage() {
 }
 async function uploadNrfImage() {
   await writeEpd(new Uint8Array([NRF_CMD.INIT])); await delay(100);
-  const planes=[{name:"đen",data:canvasBytesRowMajor("black"),flag:0x0f,start:0,end:48},{name:"đỏ",data:canvasBytesRowMajor("red"),flag:0x00,start:48,end:95}];
+  // Model 2 stores bytes column-first, from the rightmost column to the left.
+  const planes=[{name:"đen",data:canvasBytesColumnMajor("black"),flag:0x0f,start:0,end:48},{name:"đỏ",data:canvasBytesColumnMajor("red"),flag:0x00,start:48,end:95}];
   for(const plane of planes){const total=Math.ceil(plane.data.length/state.chunkSize);let part=0;for(let offset=0;offset<plane.data.length;offset+=state.chunkSize){const chunk=plane.data.slice(offset,offset+state.chunkSize);const begin=offset===0?0x00:0xf0;await writeEpd(new Uint8Array([NRF_CMD.WRITE_IMAGE,begin|plane.flag,...chunk]));part++;uploadProgress(plane.start+(part/total)*(plane.end-plane.start),`Đang gửi lớp ${plane.name}: ${part}/${total}`);await delay(8);}}
   uploadProgress(97,"Đang làm mới màn hình…");await writeEpd(new Uint8Array([NRF_CMD.REFRESH]));state.mode=0;updateDeviceUI();
 }
 async function uploadDaImage() {
-  const data=canvasBytesColumnMajor(),hex=bytesHex(data),step=480,total=Math.ceil(hex.length/step);let part=0;
+  const data=canvasBytesColumnMajor("black"),hex=bytesHex(data),step=480,total=Math.ceil(hex.length/step);let part=0;
   for(let offset=0;offset<hex.length;offset+=step){const packet=`03ff${toHex(offset/2,2)}${hex.slice(offset,offset+step)}`;await writeEpd(hexBytes(packet));part++;uploadProgress((part/total)*94,`Đang gửi khối ${part}/${total}`);}
   await delay(300);await writeEpd(hexBytes("01"));
 }
