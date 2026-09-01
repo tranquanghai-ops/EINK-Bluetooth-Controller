@@ -553,7 +553,7 @@ async function uploadDaImage() {
 }
 
 
-const DESIGN_TEMPLATE_NAMES = { clock: "Đồng hồ", calendar: "Lịch tháng", lunar: "Âm lịch", navigation: "Chỉ đường" };
+const DESIGN_TEMPLATE_NAMES = { clock: "Ảnh đồng hồ", calendar: "Lịch tháng", lunar: "Âm lịch", navigation: "Chỉ đường" };
 
 function designColor() {
   return document.querySelector('input[name="design-color"]:checked')?.value || "#111111";
@@ -714,6 +714,10 @@ function renderDesigner() {
   if (state.designSymbol) designText(dc, state.designSymbol, 237, 119, 25, 18, { color: accent, align: "right" });
   $("design-template-label").textContent = DESIGN_TEMPLATE_NAMES[state.designTemplate];
   $("navigation-fields").hidden = state.designTemplate !== "navigation";
+  const isStaticClock = state.designTemplate === "clock";
+  $("static-clock-warning").hidden = !isStaticClock;
+  $("native-clock-button").hidden = !isStaticClock;
+  $("design-use-button").textContent = isStaticClock ? "Dùng ảnh giờ hiện tại" : "Dùng thiết kế này";
 }
 
 function resetDesigner() {
@@ -724,6 +728,33 @@ function resetDesigner() {
   document.querySelector('input[name="design-color"][value="#111111"]').checked = true;
   document.querySelectorAll("[data-design-template]").forEach((button) => button.classList.toggle("active", button.dataset.designTemplate === "clock"));
   renderDesigner();
+}
+
+
+async function useNativeClock() {
+  if (!state.server?.connected || !state.protocol) {
+    toast("Hãy kết nối thiết bị trước.", true);
+    return;
+  }
+  try {
+    if (state.protocol === PROTOCOL.NRF52) {
+      await setNrfMode(2);
+    } else {
+      const now = new Date();
+      const localEpoch = Math.floor(Date.now() / 1000) - now.getTimezoneOffset() * 60 + 3600;
+      const week = now.getDay() || 7;
+      const timeCommand = `dd${toHex(localEpoch,4)}${toHex(now.getFullYear(),2)}${toHex(now.getMonth()+1)}${toHex(now.getDate())}${toHex(week)}`;
+      await writeSerialHex(timeCommand);
+      await writeSerialHex("e102", true);
+      state.mode = 2;
+      updateDeviceUI();
+      addLog("Đã đồng bộ giờ và chuyển sang đồng hồ tự chạy của DA14585.", "success");
+      toast("Đã bật đồng hồ tự chạy.");
+    }
+    showTab("control-panel");
+  } catch (error) {
+    commandError(error);
+  }
 }
 
 function useDesignerImage() {
@@ -781,6 +812,7 @@ function bindEvents() {
   document.querySelectorAll('input[name="design-color"]').forEach((input)=>input.addEventListener("change",renderDesigner));
   document.querySelectorAll("[data-design-symbol]").forEach((button)=>button.addEventListener("click",()=>{state.designSymbol=button.dataset.designSymbol;renderDesigner();}));
   $("design-use-button").addEventListener("click",useDesignerImage);
+  $("native-clock-button").addEventListener("click",useNativeClock);
   $("design-reset-button").addEventListener("click",resetDesigner);
 }
 
