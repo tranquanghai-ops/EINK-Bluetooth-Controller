@@ -20,7 +20,8 @@ const state = {
   model: null, mode: null, mtu: null, chunkSize: 128, logs: [],
   image: null, rotation: 0, fit: "contain", imageReady: false, sending: false,
   firmwareVersion: null, serviceUuids: [], characteristicUuids: [], dfu: null,
-  dfuPending: null, firmwareReadVerified: false, backupRunning: false
+  dfuPending: null, firmwareReadVerified: false, backupRunning: false,
+  designTemplate: "clock", designSymbol: ""
 };
 
 const $ = (id) => document.getElementById(id);
@@ -551,6 +552,196 @@ async function uploadDaImage() {
   await delay(300); await writeEpd(hexBytes("01"));
 }
 
+
+const DESIGN_TEMPLATE_NAMES = { clock: "Đồng hồ", calendar: "Lịch tháng", lunar: "Âm lịch", navigation: "Chỉ đường" };
+
+function designColor() {
+  return document.querySelector('input[name="design-color"]:checked')?.value || "#111111";
+}
+
+function designText(ctx2d, text, x, y, maxWidth, size, options = {}) {
+  const family = options.family || $("design-font").value || "system-ui";
+  ctx2d.save();
+  ctx2d.fillStyle = options.color || "#111";
+  ctx2d.textAlign = options.align || "left";
+  ctx2d.textBaseline = options.baseline || "alphabetic";
+  ctx2d.font = `${options.weight || 700} ${size}px ${family}`;
+  let value = String(text || "");
+  if (ctx2d.measureText(value).width > maxWidth) {
+    while (value.length > 1 && ctx2d.measureText(value + "…").width > maxWidth) value = value.slice(0, -1);
+    value += "…";
+  }
+  ctx2d.fillText(value, x, y);
+  ctx2d.restore();
+}
+
+function jdFromDate(day, month, year) {
+  const a = Math.floor((14 - month) / 12);
+  const y = year + 4800 - a;
+  const m = month + 12 * a - 3;
+  let jd = day + Math.floor((153 * m + 2) / 5) + 365 * y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) - 32045;
+  if (jd < 2299161) jd = day + Math.floor((153 * m + 2) / 5) + 365 * y + Math.floor(y / 4) - 32083;
+  return jd;
+}
+
+function newMoon(k) {
+  const T = k / 1236.85, T2 = T * T, T3 = T2 * T, dr = Math.PI / 180;
+  let jd = 2415020.75933 + 29.53058868 * k + 0.0001178 * T2 - 0.000000155 * T3;
+  jd += 0.00033 * Math.sin((166.56 + 132.87 * T - 0.009173 * T2) * dr);
+  const M = 359.2242 + 29.10535608 * k - 0.0000333 * T2 - 0.00000347 * T3;
+  const Mpr = 306.0253 + 385.81691806 * k + 0.0107306 * T2 + 0.00001236 * T3;
+  const F = 21.2964 + 390.67050646 * k - 0.0016528 * T2 - 0.00000239 * T3;
+  let c1 = (0.1734 - 0.000393 * T) * Math.sin(M * dr) + 0.0021 * Math.sin(2 * M * dr);
+  c1 -= 0.4068 * Math.sin(Mpr * dr) + 0.0161 * Math.sin(2 * Mpr * dr);
+  c1 -= 0.0004 * Math.sin(3 * Mpr * dr);
+  c1 += 0.0104 * Math.sin(2 * F * dr) - 0.0051 * Math.sin((M + Mpr) * dr);
+  c1 -= 0.0074 * Math.sin((M - Mpr) * dr) + 0.0004 * Math.sin((2 * F + M) * dr);
+  c1 -= 0.0004 * Math.sin((2 * F - M) * dr) + 0.0006 * Math.sin((2 * F + Mpr) * dr);
+  c1 += 0.0010 * Math.sin((2 * F - Mpr) * dr) + 0.0005 * Math.sin((2 * Mpr + M) * dr);
+  const delta = T < -11 ? 0.001 + 0.000839 * T + 0.0002261 * T2 - 0.00000845 * T3 - 0.000000081 * T * T3 : -0.000278 + 0.000265 * T + 0.000262 * T2;
+  return jd + c1 - delta;
+}
+
+function sunLongitude(jdn) {
+  const T = (jdn - 2451545.0) / 36525, T2 = T * T, dr = Math.PI / 180;
+  const M = 357.52910 + 35999.05030 * T - 0.0001559 * T2 - 0.00000048 * T * T2;
+  const L0 = 280.46645 + 36000.76983 * T + 0.0003032 * T2;
+  let dl = (1.914600 - 0.004817 * T - 0.000014 * T2) * Math.sin(dr * M);
+  dl += (0.019993 - 0.000101 * T) * Math.sin(2 * dr * M) + 0.000290 * Math.sin(3 * dr * M);
+  return (L0 + dl) * dr - Math.PI * 2 * Math.floor((L0 + dl) / 360);
+}
+
+function newMoonDay(k, timeZone = 7) {
+  return Math.floor(newMoon(k) + 0.5 + timeZone / 24);
+}
+
+function sunLongitudeSector(dayNumber, timeZone = 7) {
+  return Math.floor(sunLongitude(dayNumber - 0.5 - timeZone / 24) / Math.PI * 6);
+}
+
+function lunarMonth11(year, timeZone = 7) {
+  const off = jdFromDate(31, 12, year) - 2415021;
+  const k = Math.floor(off / 29.530588853);
+  let nm = newMoonDay(k, timeZone);
+  if (sunLongitudeSector(nm, timeZone) >= 9) nm = newMoonDay(k - 1, timeZone);
+  return nm;
+}
+
+function leapMonthOffset(a11, timeZone = 7) {
+  const k = Math.floor(0.5 + (a11 - 2415021.076998695) / 29.530588853);
+  let last = 0, i = 1, arc = sunLongitudeSector(newMoonDay(k + i, timeZone), timeZone);
+  do { last = arc; i += 1; arc = sunLongitudeSector(newMoonDay(k + i, timeZone), timeZone); } while (arc !== last && i < 14);
+  return i - 1;
+}
+
+function solarToLunar(date) {
+  const dayNumber = jdFromDate(date.getDate(), date.getMonth() + 1, date.getFullYear());
+  const k = Math.floor((dayNumber - 2415021.076998695) / 29.530588853);
+  let monthStart = newMoonDay(k + 1);
+  if (monthStart > dayNumber) monthStart = newMoonDay(k);
+  let a11 = lunarMonth11(date.getFullYear()), b11 = a11;
+  let lunarYear;
+  if (a11 >= monthStart) { lunarYear = date.getFullYear(); a11 = lunarMonth11(date.getFullYear() - 1); }
+  else { lunarYear = date.getFullYear() + 1; b11 = lunarMonth11(date.getFullYear() + 1); }
+  const lunarDay = dayNumber - monthStart + 1;
+  const diff = Math.floor((monthStart - a11) / 29);
+  let lunarLeap = false, lunarMonth = diff + 11;
+  if (b11 - a11 > 365) {
+    const leapDiff = leapMonthOffset(a11);
+    if (diff >= leapDiff) { lunarMonth = diff + 10; if (diff === leapDiff) lunarLeap = true; }
+  }
+  if (lunarMonth > 12) lunarMonth -= 12;
+  if (lunarMonth >= 11 && diff < 4) lunarYear -= 1;
+  return { day: lunarDay, month: lunarMonth, year: lunarYear, leap: lunarLeap };
+}
+
+function renderDesigner() {
+  const designCanvas = $("design-canvas");
+  if (!designCanvas) return;
+  const dc = designCanvas.getContext("2d");
+  const now = new Date();
+  const accent = designColor();
+  const title = $("design-title").value.trim();
+  const subtitle = $("design-subtitle").value.trim();
+  const fontSize = Math.max(12, Math.min(48, Number($("design-size").value) || 28));
+  dc.fillStyle = "#fff"; dc.fillRect(0, 0, 250, 128);
+  dc.strokeStyle = "#111"; dc.lineWidth = 2; dc.strokeRect(1, 1, 248, 126);
+  dc.fillStyle = accent;
+
+  if (state.designTemplate === "clock") {
+    dc.fillRect(0, 0, 250, 21);
+    designText(dc, title || "E‑Ink Clock", 8, 15, 190, 10, { color: "#fff", weight: 800 });
+    designText(dc, now.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }), 10, 78, 155, Math.max(32, fontSize), { family: "monospace", weight: 800 });
+    dc.strokeStyle = accent; dc.lineWidth = 2; dc.beginPath(); dc.arc(205, 61, 28, 0, Math.PI * 2); dc.stroke();
+    const angle = (now.getMinutes() / 60) * Math.PI * 2 - Math.PI / 2;
+    dc.beginPath(); dc.moveTo(205, 61); dc.lineTo(205 + Math.cos(angle) * 20, 61 + Math.sin(angle) * 20); dc.stroke();
+    designText(dc, now.toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" }), 10, 101, 225, 12, { color: accent });
+    designText(dc, subtitle, 10, 119, 225, 9, { weight: 500 });
+  } else if (state.designTemplate === "calendar") {
+    const year = now.getFullYear(), month = now.getMonth();
+    dc.fillStyle = accent; dc.fillRect(0, 0, 250, 24);
+    designText(dc, title || `THÁNG ${month + 1} · ${year}`, 125, 17, 230, 12, { color: "#fff", align: "center", weight: 800 });
+    const labels = ["T2","T3","T4","T5","T6","T7","CN"];
+    labels.forEach((label, i) => designText(dc, label, 18 + i * 35, 38, 30, 9, { align: "center", color: i > 4 ? accent : "#111" }));
+    const first = (new Date(year, month, 1).getDay() + 6) % 7;
+    const count = new Date(year, month + 1, 0).getDate();
+    for (let day = 1; day <= count; day++) {
+      const cell = first + day - 1, col = cell % 7, row = Math.floor(cell / 7);
+      const x = 18 + col * 35, y = 54 + row * 14;
+      if (day === now.getDate()) { dc.fillStyle = accent; dc.fillRect(x - 11, y - 10, 22, 13); }
+      designText(dc, day, x, y, 24, 10, { align: "center", color: day === now.getDate() ? "#fff" : (col > 4 ? accent : "#111") });
+    }
+    designText(dc, subtitle, 125, 121, 230, 8, { align: "center", weight: 500 });
+  } else if (state.designTemplate === "lunar") {
+    const lunar = solarToLunar(now);
+    dc.fillStyle = accent; dc.fillRect(0, 0, 74, 128);
+    designText(dc, now.getDate(), 37, 68, 65, 46, { color: "#fff", align: "center", family: "Georgia,serif" });
+    designText(dc, `THÁNG ${now.getMonth() + 1}`, 37, 91, 65, 11, { color: "#fff", align: "center" });
+    designText(dc, now.getFullYear(), 37, 109, 65, 10, { color: "#fff", align: "center" });
+    designText(dc, title || "ÂM LỊCH VIỆT NAM", 84, 23, 155, 12, { color: accent });
+    designText(dc, `Ngày ${lunar.day}`, 84, 60, 155, Math.max(25, fontSize), { color: "#111" });
+    designText(dc, `Tháng ${lunar.month}${lunar.leap ? " nhuận" : ""} · ${lunar.year}`, 84, 82, 155, 12, { color: accent });
+    designText(dc, subtitle, 84, 109, 155, 9, { weight: 500 });
+  } else {
+    dc.fillStyle = accent; dc.fillRect(0, 0, 76, 128);
+    designText(dc, $("design-direction").value, 38, 78, 68, 55, { color: "#fff", align: "center", family: "system-ui" });
+    designText(dc, $("design-distance").value || "200 m", 87, 47, 150, Math.max(24, fontSize), { color: "#111" });
+    designText(dc, $("design-road").value || "Đường phía trước", 87, 74, 150, 14, { color: accent });
+    designText(dc, title, 87, 98, 150, 10);
+    designText(dc, subtitle, 87, 116, 150, 8, { weight: 500 });
+  }
+
+  if (state.designSymbol) designText(dc, state.designSymbol, 237, 119, 25, 18, { color: accent, align: "right" });
+  $("design-template-label").textContent = DESIGN_TEMPLATE_NAMES[state.designTemplate];
+  $("navigation-fields").hidden = state.designTemplate !== "navigation";
+}
+
+function resetDesigner() {
+  state.designTemplate = "clock"; state.designSymbol = "";
+  $("design-title").value = "E‑Ink Clock";
+  $("design-subtitle").value = "Cập nhật ngay trên trình duyệt";
+  $("design-font").value = "system-ui"; $("design-size").value = "28";
+  document.querySelector('input[name="design-color"][value="#111111"]').checked = true;
+  document.querySelectorAll("[data-design-template]").forEach((button) => button.classList.toggle("active", button.dataset.designTemplate === "clock"));
+  renderDesigner();
+}
+
+function useDesignerImage() {
+  renderDesigner();
+  const image = new Image();
+  image.onload = () => {
+    state.image = image; state.rotation = 0; state.fit = "contain"; state.imageReady = true;
+    document.querySelectorAll("[data-fit]").forEach((button) => button.classList.toggle("active", button.dataset.fit === "contain"));
+    drawImage();
+    $("upload-button").disabled = false;
+    $("upload-status").textContent = `Thiết kế ${DESIGN_TEMPLATE_NAMES[state.designTemplate]} đã sẵn sàng`;
+    showTab("image-panel");
+    addLog(`Đã tạo ảnh từ mẫu ${DESIGN_TEMPLATE_NAMES[state.designTemplate]}.`, "success");
+    toast("Thiết kế đã chuyển sang bước truyền ảnh.");
+  };
+  image.src = $("design-canvas").toDataURL("image/png");
+}
+
 function bindEvents() {
   $("connect-button").addEventListener("click",()=>connectSelectedDevice(false));
   $("reconnect-button").addEventListener("click",()=>connectSelectedDevice(true));
@@ -579,10 +770,23 @@ function bindEvents() {
   $("rotate-image-button").addEventListener("click",()=>{state.rotation=(state.rotation+90)%360;drawImage();});
   ["brightness","contrast"].forEach((id)=>$(id).addEventListener("input",()=>{$(`${id}-output`).textContent=$(id).value;processPreview();}));
   $("dither-mode").addEventListener("change",processPreview);$("upload-button").addEventListener("click",uploadImage);
+  document.querySelectorAll("[data-design-template]").forEach((button)=>button.addEventListener("click",()=>{
+    state.designTemplate=button.dataset.designTemplate;
+    document.querySelectorAll("[data-design-template]").forEach((item)=>item.classList.toggle("active",item===button));
+    renderDesigner();
+  }));
+  ["design-title","design-subtitle","design-font","design-size","design-direction","design-distance","design-road"].forEach((id)=>{
+    $(id).addEventListener("input",renderDesigner); $(id).addEventListener("change",renderDesigner);
+  });
+  document.querySelectorAll('input[name="design-color"]').forEach((input)=>input.addEventListener("change",renderDesigner));
+  document.querySelectorAll("[data-design-symbol]").forEach((button)=>button.addEventListener("click",()=>{state.designSymbol=button.dataset.designSymbol;renderDesigner();}));
+  $("design-use-button").addEventListener("click",useDesignerImage);
+  $("design-reset-button").addEventListener("click",resetDesigner);
 }
 
 function initialize() {
-  bindEvents(); clearPreview(); updateDeviceUI();
+  bindEvents(); clearPreview(); renderDesigner(); updateDeviceUI();
+  setInterval(()=>{ if(state.designTemplate==="clock"||state.designTemplate==="lunar") renderDesigner(); },30000);
   const supported="bluetooth" in navigator;
   $("browser-warning").hidden=supported;$("connect-button").disabled=!supported;
   addLog("Ứng dụng đã sẵn sàng.","success");
