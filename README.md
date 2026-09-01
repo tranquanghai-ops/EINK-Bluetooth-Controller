@@ -11,9 +11,11 @@ Trang điều khiển Web Bluetooth dành cho màn hình E-Ink 2,13 inch 250×12
 - Chỉ hiển thị nút tương thích với thiết bị đang sử dụng.
 - Đồng bộ ngày giờ và chuyển chế độ lịch/đồng hồ/ảnh.
 - Truyền ảnh 250×128 với xử lý ba màu đen–trắng–đỏ ngay trên trình duyệt.
-- Trình thiết kế cục bộ với mẫu đồng hồ, lịch tháng, âm lịch Việt Nam và màn chỉ đường nhập tay.
+- Trình thiết kế cục bộ với mẫu đồng hồ, lịch tháng và âm lịch Việt Nam.
 - Tùy chỉnh tiêu đề, dòng phụ, kiểu/cỡ chữ, màu nhấn và biểu tượng rồi chuyển thẳng sang bước truyền ảnh.
 - Hiệu chỉnh DA14585 được đặt trong khu vực nâng cao và kiểm tra giá trị HEX.
+- Đọc thông tin firmware theo chuẩn Device Information Service 0x180A/0x2A24–0x2A29 và characteristic riêng của nRF52.
+- Tạo dấu vân tay thiết bị, từ khóa tìm firmware và xuất kèm trong tệp JSON chẩn đoán.
 - Nhật ký kết nối kèm danh sách GATT service/characteristic và xuất tệp JSON chẩn đoán.
 - Mã hóa ảnh DA14585 Legacy 250×128 theo đúng thứ tự cột và quy ước điểm ảnh của công cụ gốc.
 - Các lệnh E3/E4/E5 chưa được firmware xác nhận được đưa vào khu vực thử nghiệm.
@@ -39,7 +41,7 @@ Repository có workflow tự động triển khai. Trong GitHub, vào **Settings
 
 ## Phạm vi chuyển chức năng từ ứng dụng Android
 
-Các chức năng dựng nội dung không phụ thuộc Android đã được viết lại bằng Canvas, không sao chép tài nguyên đóng gói trong APK. Chỉ đường trên web là chế độ nhập tay vì trang web không có quyền đọc thông báo điều hướng của ứng dụng Android. OTA chưa được bật: APK lấy danh sách/tệp firmware động từ máy chủ theo model và phiên bản, nên phải xác minh firmware đích và giao thức ghi trước.
+Các chức năng dựng nội dung không phụ thuộc Android đã được viết lại bằng Canvas, không sao chép tài nguyên đóng gói trong APK. OTA chưa được bật: APK lấy danh sách/tệp firmware động từ máy chủ theo model và phiên bản, nên phải xác minh firmware đích và giao thức ghi trước.
 
 
 ## An toàn khi sao lưu firmware
