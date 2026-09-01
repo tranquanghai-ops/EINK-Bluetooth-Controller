@@ -17,7 +17,7 @@
         <p>Điều khiển Bluetooth cho DA14585 và nRF52</p>
       </div>
     </div>
-    <div class="header-chip">Web 1.2 · Xử lý cục bộ</div>
+    <div class="header-chip">Web 1.3 · Xử lý cục bộ</div>
   </header>
 
   <main class="app-shell">
@@ -159,7 +159,6 @@
                 <button class="template-button active" type="button" data-design-template="clock"><span>07:48</span><strong>Ảnh đồng hồ</strong></button>
                 <button class="template-button" type="button" data-design-template="calendar"><span>31</span><strong>Lịch tháng</strong></button>
                 <button class="template-button" type="button" data-design-template="lunar"><span>ÂL</span><strong>Âm lịch</strong></button>
-                <button class="template-button" type="button" data-design-template="navigation"><span>↱</span><strong>Chỉ đường</strong></button>
               </div>
               <div class="static-clock-warning" id="static-clock-warning">
                 <strong>Đây là ảnh giờ hiện tại, không phải đồng hồ tự chạy.</strong>
@@ -178,16 +177,6 @@
                 <label><input type="radio" name="design-color" value="#111111" checked><span class="swatch black"></span>Đen</label>
                 <label><input type="radio" name="design-color" value="#d61f26"><span class="swatch red"></span>Đỏ</label>
               </fieldset>
-            </div>
-
-            <div class="tool-section navigation-fields" id="navigation-fields" hidden>
-              <h3>Nội dung chỉ đường</h3>
-              <div class="two-fields">
-                <label>Hướng<select id="design-direction"><option value="↑">Đi thẳng</option><option value="↰">Rẽ trái</option><option value="↱">Rẽ phải</option><option value="↶">Quay đầu</option></select></label>
-                <label>Khoảng cách<input id="design-distance" type="text" maxlength="12" value="200 m"></label>
-              </div>
-              <label>Tên đường<input id="design-road" type="text" maxlength="30" value="Đường phía trước"></label>
-              <p class="field-note">Bản web tạo màn hình chỉ đường nhập tay; trình duyệt không thể tự đọc thông báo điều hướng Android.</p>
             </div>
 
             <div class="designer-actions">
@@ -266,6 +255,25 @@
               <div><dt>Bluetooth services</dt><dd id="diag-services">Chưa quét</dd></div>
             </dl>
           </article>
+          <article class="panel-card diagnostic-card device-info-card">
+            <div class="card-heading"><div class="card-icon">ⓘ</div><div><h3>Thông tin thiết bị và firmware</h3><p>Chỉ đọc GATT; không gửi lệnh ghi, xóa hoặc OTA.</p></div></div>
+            <p class="device-info-status" id="device-info-status">Bấm nút bên dưới sau khi kết nối.</p>
+            <dl class="diagnostic-list">
+              <div><dt>Tên Bluetooth</dt><dd id="info-device-name">Chưa đọc</dd></div>
+              <div><dt>Nhà sản xuất</dt><dd id="info-manufacturer">Chưa đọc</dd></div>
+              <div><dt>Model</dt><dd id="info-model">Chưa đọc</dd></div>
+              <div><dt>Serial</dt><dd id="info-serial">Chưa đọc</dd></div>
+              <div><dt>Firmware</dt><dd id="info-firmware">Chưa đọc</dd></div>
+              <div><dt>Hardware</dt><dd id="info-hardware">Chưa đọc</dd></div>
+              <div><dt>Software</dt><dd id="info-software">Chưa đọc</dd></div>
+              <div><dt>Dấu vân tay</dt><dd id="info-fingerprint">Chưa tạo</dd></div>
+            </dl>
+            <div class="firmware-info-actions">
+              <button class="button button-primary" id="read-device-info-button" type="button">Đọc thông tin FW</button>
+              <button class="button button-secondary" id="copy-firmware-search-button" type="button" disabled>Sao chép từ khóa</button>
+              <a class="button button-ghost" id="firmware-search-link" href="#" target="_blank" rel="noopener" hidden>Tìm trên Google</a>
+            </div>
+          </article>
           <article class="panel-card diagnostic-card" id="firmware-card" hidden>
             <div class="card-heading"><div class="card-icon">↓</div><div><h3>Sao lưu firmware qua Bluetooth</h3><p>Chỉ hiện khi có đúng dịch vụ Telink 0x221F/0x331F.</p></div></div>
             <div class="firmware-warning">Chức năng này chỉ đọc vùng 0x20000–0x3FFFF, không xóa và không ghi Flash. Không ngắt Bluetooth trong lúc sao lưu.</div>
@@ -289,7 +297,7 @@
 
   <footer class="app-footer">
     <span>Phát triển bởi <strong>ThS. Trần Quang Hải</strong></span>
-    <span>Phiên bản Web 1.2.1</span>
+    <span>Phiên bản Web 1.3.0</span>
   </footer>
 
   <div class="toast-region" id="toast-region" aria-live="polite"></div>
