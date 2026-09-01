@@ -29,7 +29,8 @@ const state = {
   image: null, rotation: 0, fit: "contain", imageReady: false, sending: false,
   firmwareVersion: null, firmwareVersionCode: null, serviceUuids: [], characteristicUuids: [], dfu: null,
   dfuPending: null, firmwareReadVerified: false, backupRunning: false,
-  designTemplate: "clock", designSymbol: "",
+  designTemplate: "clock", designSymbol: "", designerElements: [], selectedElementId: null,
+  nextElementId: 1, designerDrag: null,
   deviceInfo: null, firmwareSearchQuery: ""
 };
 
@@ -81,7 +82,7 @@ function showTab(panelId) {
 }
 
 function modeName(mode) {
-  return ({ 0: "Ảnh", 1: "Lịch", 2: "Đồng hồ 1", 3: "Đồng hồ 2" })[mode] || "Chưa rõ";
+  return ({ 0: "Ảnh", 1: "Lịch", 2: "Đồng hồ 1", 3: "Đồng hồ 2" })[mode] || (mode >= 4 && mode <= 8 ? `Thử nghiệm ${mode}` : "Chưa rõ");
 }
 
 function updateDeviceUI() {
@@ -114,6 +115,8 @@ function updateDeviceUI() {
   $("da-mode-controls").hidden = isNrf;
   $("week-start-row").hidden = !isNrf;
   document.querySelectorAll(".da-only").forEach((element) => { element.hidden = isNrf; });
+  const supportsModeSurvey = isNrf && state.firmwareVersionCode === 0x26;
+  document.querySelectorAll(".nrf-only").forEach((element) => { element.hidden = !supportsModeSurvey; });
   $("image-device-label").textContent = isNrf ? `nRF52 model ${state.model ?? 2}` : "DA14585 Legacy";
   document.querySelectorAll("[data-nrf-mode]").forEach((button) => button.classList.toggle("active", Number(button.dataset.nrfMode) === state.mode));
   updateDiagnosticsUI();
@@ -561,7 +564,26 @@ async function setNrfMode(mode) {
     await writeEpd(new Uint8Array([NRF_CMD.SET_TIME, timestamp >>> 24, timestamp >>> 16, timestamp >>> 8, timestamp, timezone & 0xff, mode]));
     state.mode = mode; updateDeviceUI();
     addLog(`Đã chuyển sang ${modeName(mode)}`, "success"); toast(`Đã chọn ${modeName(mode)}.`);
-  } catch (error) { commandError(error); }
+    return true;
+  } catch (error) { commandError(error); return false; }
+}
+
+async function testExperimentalMode() {
+  if (state.protocol !== PROTOCOL.NRF52) return toast("Chức năng này chỉ dành cho thiết bị nRF52.", true);
+  if (!$("mode-risk-ack").checked) return toast("Hãy xác nhận cảnh báo trước khi thử.", true);
+  const mode = Number($("experimental-mode").value);
+  if (!Number.isInteger(mode) || mode < 4 || mode > 8) return toast("Mode thử nghiệm không hợp lệ.", true);
+  const sent = await setNrfMode(mode);
+  if (!sent) return;
+  $("mode-explorer-status").textContent = `Đã gửi mode ${mode}. Hãy quan sát màn hình trong 1–2 phút; nếu không ổn, bấm “Quay về Lịch”.`;
+  addLog(`Khảo sát firmware: đã gửi mode ${mode}; không ghi Flash.`, "info");
+}
+
+async function restoreCalendarMode() {
+  if (state.protocol !== PROTOCOL.NRF52) return;
+  const sent = await setNrfMode(1);
+  if (!sent) return;
+  $("mode-explorer-status").textContent = "Đã quay về mode 1 · Lịch.";
 }
 
 async function refreshScreen() {
@@ -703,7 +725,7 @@ async function uploadDaImage() {
 }
 
 
-const DESIGN_TEMPLATE_NAMES = { clock: "Ảnh đồng hồ", calendar: "Lịch tháng", lunar: "Âm lịch" };
+const DESIGN_TEMPLATE_NAMES = { clock: "Ảnh đồng hồ", calendar: "Lịch tháng", lunar: "Âm lịch", countdown: "Đếm ngược", blank: "Trang trắng" };
 
 function designColor() {
   return document.querySelector('input[name="design-color"]:checked')?.value || "#111111";
@@ -805,6 +827,65 @@ function solarToLunar(date) {
   return { day: lunarDay, month: lunarMonth, year: lunarYear, leap: lunarLeap };
 }
 
+function selectedDesignerElement() {
+  return state.designerElements.find((item) => item.id === state.selectedElementId) || null;
+}
+
+function qrModules(value) {
+  if (typeof qrcode !== "function") throw new Error("Thư viện QR chưa tải xong");
+  const qr = qrcode(0, "M");
+  qr.addData(value, "Byte");
+  qr.make();
+  const count = qr.getModuleCount();
+  return { count, dark: (row, col) => qr.isDark(row, col) };
+}
+
+function designerElementBounds(element) {
+  const scale = element.scale || 1;
+  return { width: (element.width || 60) * scale, height: (element.height || 30) * scale };
+}
+
+function drawDesignerElement(dc, element, selected) {
+  const { width, height } = designerElementBounds(element);
+  dc.save();
+  dc.translate(element.x, element.y);
+  dc.rotate((element.rotation || 0) * Math.PI / 180);
+  if (element.type === "text") {
+    const size = Math.max(7, (element.fontSize || 18) * (element.scale || 1));
+    dc.font = `800 ${size}px ${element.family || $("design-font").value || "system-ui"}`;
+    dc.textAlign = "center"; dc.textBaseline = "middle"; dc.fillStyle = element.color || designColor();
+    dc.fillText(element.text, 0, 0);
+    element.width = Math.max(18, dc.measureText(element.text).width / (element.scale || 1));
+    element.height = Math.max(12, size / (element.scale || 1));
+  } else if (element.type === "qr") {
+    const modules = element.modules;
+    const quiet = 2, cells = modules.count + quiet * 2, cell = width / cells;
+    dc.fillStyle = "#fff"; dc.fillRect(-width / 2, -height / 2, width, height);
+    dc.fillStyle = "#111";
+    for (let row = 0; row < modules.count; row++) for (let col = 0; col < modules.count; col++) {
+      if (modules.dark(row, col)) dc.fillRect(-width / 2 + (col + quiet) * cell, -height / 2 + (row + quiet) * cell, Math.ceil(cell), Math.ceil(cell));
+    }
+  } else if (element.type === "image" && element.image) {
+    dc.drawImage(element.image, -width / 2, -height / 2, width, height);
+  }
+  if (selected) {
+    dc.strokeStyle = "#1677a6"; dc.lineWidth = 1; dc.setLineDash([4, 2]);
+    dc.strokeRect(-width / 2 - 2, -height / 2 - 2, width + 4, height + 4);
+    dc.setLineDash([]); dc.fillStyle = "#1677a6"; dc.fillRect(width / 2 - 2, height / 2 - 2, 5, 5);
+  }
+  dc.restore();
+}
+
+function updateSelectionUI() {
+  const element = selectedDesignerElement();
+  $("selection-tools").hidden = !element;
+  $("design-canvas").classList.toggle("has-selection", Boolean(element));
+  if (!element) return;
+  const size = Math.round((element.scale || 1) * 100), rotation = Math.round(element.rotation || 0);
+  $("object-size").value = String(size); $("object-size-output").textContent = `${size}%`;
+  $("object-rotate").value = String(rotation); $("object-rotate-output").textContent = `${rotation}°`;
+}
+
 function renderDesigner() {
   const designCanvas = $("design-canvas");
   if (!designCanvas) return;
@@ -852,25 +933,119 @@ function renderDesigner() {
     designText(dc, `Ngày ${lunar.day}`, 84, 60, 155, Math.max(25, fontSize), { color: "#111" });
     designText(dc, `Tháng ${lunar.month}${lunar.leap ? " nhuận" : ""} · ${lunar.year}`, 84, 82, 155, 12, { color: accent });
     designText(dc, subtitle, 84, 109, 155, 9, { weight: 500 });
+  } else if (state.designTemplate === "countdown") {
+    const rawDate = $("countdown-date").value;
+    const target = rawDate ? new Date(`${rawDate}T00:00:00`) : new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const days = Math.max(0, Math.ceil((target - today) / 86400000));
+    const label = $("countdown-label").value.trim() || "NGÀY CÒN LẠI";
+    dc.fillStyle = accent; dc.fillRect(0, 0, 250, 24);
+    designText(dc, title || "ĐẾM NGƯỢC SỰ KIỆN", 125, 17, 232, 12, { color: "#fff", align: "center", weight: 800 });
+    designText(dc, days, 72, 91, 120, 66, { color: accent, align: "center", family: "monospace", weight: 800 });
+    dc.strokeStyle = accent; dc.lineWidth = 2; dc.strokeRect(135, 39, 100, 49);
+    designText(dc, label, 185, 61, 90, 11, { color: "#111", align: "center", weight: 800 });
+    designText(dc, target.toLocaleDateString("vi-VN"), 185, 80, 90, 13, { color: accent, align: "center", weight: 800 });
+    designText(dc, subtitle, 125, 117, 226, 9, { align: "center", weight: 500 });
+  } else if (state.designTemplate === "blank") {
+    designText(dc, title, 125, 22, 225, 12, { color: accent, align: "center", weight: 800 });
+    designText(dc, subtitle, 125, 119, 225, 9, { align: "center", weight: 500 });
   }
 
   if (state.designSymbol) designText(dc, state.designSymbol, 237, 119, 25, 18, { color: accent, align: "right" });
+  state.designerElements.forEach((element) => drawDesignerElement(dc, element, element.id === state.selectedElementId));
   $("design-template-label").textContent = DESIGN_TEMPLATE_NAMES[state.designTemplate];
   const isStaticClock = state.designTemplate === "clock";
-  $("static-clock-warning").hidden = !isStaticClock;
+  const isStaticCountdown = state.designTemplate === "countdown";
+  $("static-clock-warning").hidden = !isStaticClock && !isStaticCountdown;
+  $("static-clock-warning").querySelector("strong").textContent = isStaticCountdown ? "Đây là ảnh đếm ngược tại thời điểm tạo." : "Đây là ảnh giờ hiện tại, không phải đồng hồ tự chạy.";
+  $("static-clock-warning").querySelector("span").textContent = isStaticCountdown ? "Số ngày trên ảnh không tự giảm. Khu vực khảo sát mode sẽ giúp kiểm tra firmware có bộ đếm động ẩn hay không." : "Sau khi truyền ảnh, giờ trên ảnh sẽ đứng yên. Hãy chọn “Đồng hồ tự chạy” để dùng chế độ đồng hồ trong firmware.";
+  $("countdown-fields").hidden = !isStaticCountdown;
   $("native-clock-button").hidden = !isStaticClock;
   $("design-use-button").textContent = isStaticClock ? "Dùng ảnh giờ hiện tại" : "Dùng thiết kế này";
+  updateSelectionUI();
 }
 
 function resetDesigner() {
-  state.designTemplate = "clock"; state.designSymbol = "";
+  state.designTemplate = "clock"; state.designSymbol = ""; state.designerElements = []; state.selectedElementId = null;
   $("design-title").value = "E‑Ink Clock";
   $("design-subtitle").value = "Cập nhật ngay trên trình duyệt";
   $("design-font").value = "system-ui"; $("design-size").value = "28";
+  const nextMonth = new Date(); nextMonth.setMonth(nextMonth.getMonth() + 1);
+  $("countdown-date").value = nextMonth.toISOString().slice(0, 10); $("countdown-label").value = "NGÀY CÒN LẠI";
   document.querySelector('input[name="design-color"][value="#111111"]').checked = true;
   document.querySelectorAll("[data-design-template]").forEach((button) => button.classList.toggle("active", button.dataset.designTemplate === "clock"));
   renderDesigner();
 }
+
+function addDesignerText() {
+  const text = $("element-text").value.trim();
+  if (!text) return toast("Hãy nhập nội dung chữ.", true);
+  const element = { id: state.nextElementId++, type: "text", text, x: 125, y: 64, width: 80, height: 18, fontSize: 18, scale: 1, rotation: 0, color: designColor() };
+  state.designerElements.push(element); state.selectedElementId = element.id; $("element-text").value = ""; renderDesigner();
+}
+
+function addDesignerQr() {
+  const value = $("qr-content").value.trim();
+  if (!value || value === "https://") return toast("Hãy nhập liên kết hoặc nội dung QR.", true);
+  try {
+    const element = { id: state.nextElementId++, type: "qr", value, modules: qrModules(value), x: 195, y: 70, width: 82, height: 82, scale: 1, rotation: 0 };
+    state.designerElements.push(element); state.selectedElementId = element.id; renderDesigner(); toast("Đã tạo mã QR. Kéo QR đến vị trí mong muốn.");
+  } catch (error) { toast(`Không tạo được QR: ${error.message}`, true); }
+}
+
+function addDesignerImage(file) {
+  if (!file || !file.type.startsWith("image/")) return;
+  const url = URL.createObjectURL(file), image = new Image();
+  image.onload = () => {
+    URL.revokeObjectURL(url);
+    const maxWidth = 105, maxHeight = 90, ratio = Math.min(maxWidth / image.width, maxHeight / image.height, 1);
+    const element = { id: state.nextElementId++, type: "image", image, x: 125, y: 64, width: image.width * ratio, height: image.height * ratio, scale: 1, rotation: 0 };
+    state.designerElements.push(element); state.selectedElementId = element.id; renderDesigner(); toast("Đã thêm hình. Kéo để di chuyển.");
+  };
+  image.onerror = () => { URL.revokeObjectURL(url); toast("Không đọc được hình ảnh.", true); };
+  image.src = url;
+}
+
+function mutateSelectedElement(action) {
+  const element = selectedDesignerElement(); if (!element) return;
+  const index = state.designerElements.indexOf(element);
+  if (action === "delete") { state.designerElements.splice(index, 1); state.selectedElementId = null; }
+  if (action === "duplicate") { const copy = { ...element, id: state.nextElementId++, x: Math.min(240, element.x + 8), y: Math.min(120, element.y + 8) }; state.designerElements.push(copy); state.selectedElementId = copy.id; }
+  if (action === "front") { state.designerElements.splice(index, 1); state.designerElements.push(element); }
+  if (action === "back") { state.designerElements.splice(index, 1); state.designerElements.unshift(element); }
+  renderDesigner();
+}
+
+function designerPoint(event) {
+  const canvas = $("design-canvas"), rect = canvas.getBoundingClientRect();
+  return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height };
+}
+
+function hitDesignerElement(point) {
+  return [...state.designerElements].reverse().find((element) => {
+    const { width, height } = designerElementBounds(element);
+    return Math.abs(point.x - element.x) <= width / 2 + 5 && Math.abs(point.y - element.y) <= height / 2 + 5;
+  }) || null;
+}
+
+function beginDesignerDrag(event) {
+  const point = designerPoint(event), element = hitDesignerElement(point);
+  state.selectedElementId = element?.id ?? null;
+  state.designerDrag = element ? { id: element.id, dx: point.x - element.x, dy: point.y - element.y } : null;
+  if (element && event.currentTarget.setPointerCapture) event.currentTarget.setPointerCapture(event.pointerId);
+  renderDesigner();
+}
+
+function moveDesignerDrag(event) {
+  if (!state.designerDrag) return;
+  const element = selectedDesignerElement(); if (!element) return;
+  const point = designerPoint(event), { width, height } = designerElementBounds(element);
+  element.x = Math.max(width / 2, Math.min(250 - width / 2, point.x - state.designerDrag.dx));
+  element.y = Math.max(height / 2, Math.min(128 - height / 2, point.y - state.designerDrag.dy));
+  renderDesigner();
+}
+
+function endDesignerDrag() { state.designerDrag = null; }
 
 
 async function useNativeClock() {
@@ -900,10 +1075,16 @@ async function useNativeClock() {
 }
 
 function useDesignerImage() {
+  const selectedId = state.selectedElementId;
+  state.selectedElementId = null;
+  renderDesigner();
+  const designDataUrl = $("design-canvas").toDataURL("image/png");
+  state.selectedElementId = selectedId;
   renderDesigner();
   const image = new Image();
   image.onload = () => {
     state.image = image; state.rotation = 0; state.fit = "contain"; state.imageReady = true;
+    if (state.designerElements.some((element) => element.type === "qr")) $("dither-mode").value = "nearest";
     document.querySelectorAll("[data-fit]").forEach((button) => button.classList.toggle("active", button.dataset.fit === "contain"));
     drawImage();
     $("upload-button").disabled = false;
@@ -912,7 +1093,7 @@ function useDesignerImage() {
     addLog(`Đã tạo ảnh từ mẫu ${DESIGN_TEMPLATE_NAMES[state.designTemplate]}.`, "success");
     toast("Thiết kế đã chuyển sang bước truyền ảnh.");
   };
-  image.src = $("design-canvas").toDataURL("image/png");
+  image.src = designDataUrl;
 }
 
 function bindEvents() {
@@ -939,6 +1120,9 @@ function bindEvents() {
   $("advanced-toggle").addEventListener("click",()=>{const open=$("advanced-content").hidden;$("advanced-content").hidden=!open;$("advanced-toggle").setAttribute("aria-expanded",String(open));});
   $("calibration-value").addEventListener("input",validateCalibration);$("calibrate-button").addEventListener("click",calibrateDa);
   $("sleep-on-button").addEventListener("click",()=>setSleep(true));$("sleep-off-button").addEventListener("click",()=>setSleep(false));
+  $("mode-risk-ack").addEventListener("change",()=>{$("test-mode-button").disabled=!$("mode-risk-ack").checked;});
+  $("test-mode-button").addEventListener("click",()=>testExperimentalMode().catch(commandError));
+  $("restore-calendar-button").addEventListener("click",()=>restoreCalendarMode().catch(commandError));
   $("image-file").addEventListener("change",(event)=>loadImageFile(event.target.files[0]));
   const zone=$("drop-zone");["dragenter","dragover"].forEach((name)=>zone.addEventListener(name,(event)=>{event.preventDefault();zone.classList.add("dragover");}));["dragleave","drop"].forEach((name)=>zone.addEventListener(name,(event)=>{event.preventDefault();zone.classList.remove("dragover");}));zone.addEventListener("drop",(event)=>loadImageFile(event.dataTransfer.files[0]));
   document.querySelectorAll("[data-fit]").forEach((button)=>button.addEventListener("click",()=>{state.fit=button.dataset.fit;document.querySelectorAll("[data-fit]").forEach((b)=>b.classList.toggle("active",b===button));drawImage();}));
@@ -950,7 +1134,7 @@ function bindEvents() {
     document.querySelectorAll("[data-design-template]").forEach((item)=>item.classList.toggle("active",item===button));
     renderDesigner();
   }));
-  ["design-title","design-subtitle","design-font","design-size"].forEach((id)=>{
+  ["design-title","design-subtitle","design-font","design-size","countdown-date","countdown-label"].forEach((id)=>{
     $(id).addEventListener("input",renderDesigner); $(id).addEventListener("change",renderDesigner);
   });
   document.querySelectorAll('input[name="design-color"]').forEach((input)=>input.addEventListener("change",renderDesigner));
@@ -958,10 +1142,24 @@ function bindEvents() {
   $("design-use-button").addEventListener("click",useDesignerImage);
   $("native-clock-button").addEventListener("click",useNativeClock);
   $("design-reset-button").addEventListener("click",resetDesigner);
+  $("add-text-button").addEventListener("click",addDesignerText);
+  $("element-text").addEventListener("keydown",(event)=>{if(event.key==="Enter") addDesignerText();});
+  $("add-qr-button").addEventListener("click",addDesignerQr);
+  $("element-image-file").addEventListener("change",(event)=>{addDesignerImage(event.target.files[0]);event.target.value="";});
+  $("object-size").addEventListener("input",()=>{const element=selectedDesignerElement();if(!element)return;element.scale=Number($("object-size").value)/100;$("object-size-output").textContent=`${$("object-size").value}%`;renderDesigner();});
+  $("object-rotate").addEventListener("input",()=>{const element=selectedDesignerElement();if(!element)return;element.rotation=Number($("object-rotate").value);$("object-rotate-output").textContent=`${$("object-rotate").value}°`;renderDesigner();});
+  document.querySelectorAll("[data-nudge]").forEach((button)=>button.addEventListener("click",()=>{const element=selectedDesignerElement();if(!element)return;const [dx,dy]=button.dataset.nudge.split(",").map(Number);element.x=Math.max(0,Math.min(250,element.x+dx));element.y=Math.max(0,Math.min(128,element.y+dy));renderDesigner();}));
+  $("duplicate-object-button").addEventListener("click",()=>mutateSelectedElement("duplicate"));
+  $("send-back-button").addEventListener("click",()=>mutateSelectedElement("back"));
+  $("bring-front-button").addEventListener("click",()=>mutateSelectedElement("front"));
+  $("delete-object-button").addEventListener("click",()=>mutateSelectedElement("delete"));
+  const designerCanvas=$("design-canvas");designerCanvas.addEventListener("pointerdown",beginDesignerDrag);designerCanvas.addEventListener("pointermove",moveDesignerDrag);designerCanvas.addEventListener("pointerup",endDesignerDrag);designerCanvas.addEventListener("pointercancel",endDesignerDrag);
 }
 
 function initialize() {
-  bindEvents(); clearPreview(); renderDesigner(); updateDeviceUI();
+  bindEvents(); clearPreview();
+  const nextMonth=new Date();nextMonth.setMonth(nextMonth.getMonth()+1);$("countdown-date").value=nextMonth.toISOString().slice(0,10);
+  renderDesigner(); updateDeviceUI();
   setInterval(()=>{ if(state.designTemplate==="clock"||state.designTemplate==="lunar") renderDesigner(); },30000);
   const supported="bluetooth" in navigator;
   $("browser-warning").hidden=supported;$("connect-button").disabled=!supported;
