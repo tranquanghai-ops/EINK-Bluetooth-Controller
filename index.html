@@ -17,7 +17,7 @@
         <p>Điều khiển Bluetooth cho DA14585 và nRF52</p>
       </div>
     </div>
-    <div class="header-chip">Xử lý cục bộ · Không tải ảnh lên mạng</div>
+    <div class="header-chip">Web 1.2 · Xử lý cục bộ</div>
   </header>
 
   <main class="app-shell">
@@ -66,6 +66,7 @@
     <div class="workspace" id="workspace" hidden>
       <nav class="tab-list" aria-label="Khu vực điều khiển">
         <button class="tab active" type="button" data-tab="control-panel">Điều khiển</button>
+        <button class="tab" type="button" data-tab="design-panel">Thiết kế</button>
         <button class="tab" type="button" data-tab="image-panel">Truyền ảnh</button>
         <button class="tab" type="button" data-tab="log-panel">Nhật ký <span class="tab-count" id="log-count">0</span></button>
       </nav>
@@ -142,6 +143,67 @@
             </div>
           </div>
         </article>
+      </section>
+
+      <section class="tab-panel" id="design-panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">THIẾT KẾ CỤC BỘ</p><h2>Tạo màn hình E‑Ink của riêng bạn</h2></div>
+          <span class="device-ready">250 × 128 · đen / trắng / đỏ</span>
+        </div>
+
+        <div class="designer-workspace">
+          <aside class="designer-tools panel-card">
+            <div class="tool-section">
+              <h3>Mẫu hiển thị</h3>
+              <div class="template-grid">
+                <button class="template-button active" type="button" data-design-template="clock"><span>07:48</span><strong>Đồng hồ</strong></button>
+                <button class="template-button" type="button" data-design-template="calendar"><span>31</span><strong>Lịch tháng</strong></button>
+                <button class="template-button" type="button" data-design-template="lunar"><span>ÂL</span><strong>Âm lịch</strong></button>
+                <button class="template-button" type="button" data-design-template="navigation"><span>↱</span><strong>Chỉ đường</strong></button>
+              </div>
+            </div>
+
+            <div class="tool-section designer-fields">
+              <label>Tiêu đề<input id="design-title" type="text" maxlength="36" value="E‑Ink Clock"></label>
+              <label>Dòng phụ<input id="design-subtitle" type="text" maxlength="48" value="Cập nhật ngay trên trình duyệt"></label>
+              <div class="two-fields">
+                <label>Kiểu chữ<select id="design-font"><option value="system-ui">Hiện đại</option><option value="Georgia,serif">Cổ điển</option><option value="monospace">Kỹ thuật số</option></select></label>
+                <label>Cỡ chữ<input id="design-size" type="number" min="12" max="48" value="28"></label>
+              </div>
+              <fieldset class="color-picker"><legend>Màu nhấn</legend>
+                <label><input type="radio" name="design-color" value="#111111" checked><span class="swatch black"></span>Đen</label>
+                <label><input type="radio" name="design-color" value="#d61f26"><span class="swatch red"></span>Đỏ</label>
+              </fieldset>
+            </div>
+
+            <div class="tool-section navigation-fields" id="navigation-fields" hidden>
+              <h3>Nội dung chỉ đường</h3>
+              <div class="two-fields">
+                <label>Hướng<select id="design-direction"><option value="↑">Đi thẳng</option><option value="↰">Rẽ trái</option><option value="↱">Rẽ phải</option><option value="↶">Quay đầu</option></select></label>
+                <label>Khoảng cách<input id="design-distance" type="text" maxlength="12" value="200 m"></label>
+              </div>
+              <label>Tên đường<input id="design-road" type="text" maxlength="30" value="Đường phía trước"></label>
+              <p class="field-note">Bản web tạo màn hình chỉ đường nhập tay; trình duyệt không thể tự đọc thông báo điều hướng Android.</p>
+            </div>
+
+            <div class="designer-actions">
+              <button class="button button-primary" id="design-use-button" type="button">Dùng thiết kế này</button>
+              <button class="button button-ghost" id="design-reset-button" type="button">Đặt lại</button>
+            </div>
+          </aside>
+
+          <article class="designer-preview panel-card">
+            <div class="preview-top"><span>Xem trước 1:1</span><span id="design-template-label">Đồng hồ</span></div>
+            <div class="screen-frame designer-screen"><canvas id="design-canvas" width="250" height="128" aria-label="Bản xem trước thiết kế"></canvas></div>
+            <div class="quick-symbols" aria-label="Biểu tượng nhanh">
+              <span>Biểu tượng:</span>
+              <button type="button" data-design-symbol="☀">☀</button><button type="button" data-design-symbol="☁">☁</button>
+              <button type="button" data-design-symbol="♥">♥</button><button type="button" data-design-symbol="⚑">⚑</button>
+              <button type="button" data-design-symbol="">Xóa</button>
+            </div>
+            <div class="designer-note"><strong>Không gửi dữ liệu ra máy chủ.</strong> Khi bấm “Dùng thiết kế này”, ảnh sẽ được chuyển sang bước xử lý và truyền Bluetooth hiện có.</div>
+          </article>
+        </div>
       </section>
 
       <section class="tab-panel" id="image-panel">
