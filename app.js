@@ -10,10 +10,18 @@ const UUID = {
   DA_LEGACY_SERVICE: "13187b10-eba9-a3ba-044e-83d3217d9a38",
   DA_LEGACY_CHARACTERISTIC: "4b646063-6264-f3a7-8941-e65356ea82fe",
   DA_DFU_SERVICE: "0000221f-0000-1000-8000-00805f9b34fb",
-  DA_DFU_CHARACTERISTIC: "0000331f-0000-1000-8000-00805f9b34fb"
+  DA_DFU_CHARACTERISTIC: "0000331f-0000-1000-8000-00805f9b34fb",
+  DEVICE_INFO_SERVICE: "0000180a-0000-1000-8000-00805f9b34fb",
+  MODEL_CHARACTERISTIC: "00002a24-0000-1000-8000-00805f9b34fb",
+  SERIAL_CHARACTERISTIC: "00002a25-0000-1000-8000-00805f9b34fb",
+  FIRMWARE_CHARACTERISTIC: "00002a26-0000-1000-8000-00805f9b34fb",
+  HARDWARE_CHARACTERISTIC: "00002a27-0000-1000-8000-00805f9b34fb",
+  SOFTWARE_CHARACTERISTIC: "00002a28-0000-1000-8000-00805f9b34fb",
+  MANUFACTURER_CHARACTERISTIC: "00002a29-0000-1000-8000-00805f9b34fb",
+  IOT47_SERVICE: "afdb0001-1234-abcd-2007-aabbccddeeff"
 };
 const NRF_CMD = { INIT: 0x01, CLEAR: 0x02, REFRESH: 0x05, SLEEP: 0x06, SET_TIME: 0x20, WEEK_START: 0x21, WRITE_IMAGE: 0x30 };
-const OPTIONAL_SERVICES = [UUID.NRF_SERVICE, UUID.DA_SERIAL_SERVICE, UUID.DA_LEGACY_SERVICE, UUID.DA_DFU_SERVICE];
+const OPTIONAL_SERVICES = [UUID.NRF_SERVICE, UUID.DA_SERIAL_SERVICE, UUID.DA_LEGACY_SERVICE, UUID.DA_DFU_SERVICE, UUID.DEVICE_INFO_SERVICE, UUID.IOT47_SERVICE];
 
 const state = {
   device: null, server: null, protocol: null, epd: null, serial: null,
@@ -21,7 +29,8 @@ const state = {
   image: null, rotation: 0, fit: "contain", imageReady: false, sending: false,
   firmwareVersion: null, serviceUuids: [], characteristicUuids: [], dfu: null,
   dfuPending: null, firmwareReadVerified: false, backupRunning: false,
-  designTemplate: "clock", designSymbol: ""
+  designTemplate: "clock", designSymbol: "",
+  deviceInfo: null, firmwareSearchQuery: ""
 };
 
 const $ = (id) => document.getElementById(id);
@@ -126,6 +135,137 @@ function updateDiagnosticsUI() {
     ? (state.firmwareReadVerified ? "Đã xác minh đọc Flash. Có thể tạo bản sao .bin." : "Đã thấy dịch vụ Telink OTA. Hãy kiểm tra đọc trước.")
     : "Thiết bị không công bố dịch vụ đọc Flash 0x221F/0x331F.";
   $("firmware-backup-button").disabled = !state.firmwareReadVerified || state.backupRunning;
+  updateDeviceInfoUI();
+}
+
+function gattText(view) {
+  const data = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+  const decoded = new TextDecoder("utf-8", { fatal: false }).decode(data).replace(/\0/g, "").trim();
+  return decoded && /^[\x20-\x7e\u00a0-\uffff]+$/.test(decoded) ? decoded : `HEX: ${bytesHex(data)}`;
+}
+
+async function readGattText(service, uuid) {
+  const characteristic = await service.getCharacteristic(uuid);
+  return gattText(await characteristic.readValue());
+}
+
+function updateDeviceInfoUI() {
+  const info = state.deviceInfo || {};
+  $("info-device-name").textContent = info.name || state.device?.name || "Chưa đọc";
+  $("info-manufacturer").textContent = info.manufacturer || "Không công bố";
+  $("info-model").textContent = info.model || (state.model ? `nRF52 model ${state.model}` : "Không công bố");
+  $("info-serial").textContent = info.serial || "Không công bố";
+  $("info-firmware").textContent = info.firmware || state.firmwareVersion || "Không công bố";
+  $("info-hardware").textContent = info.hardware || "Không công bố";
+  $("info-software").textContent = info.software || "Không công bố";
+  $("info-fingerprint").textContent = info.fingerprint || "Chưa tạo";
+  $("copy-firmware-search-button").disabled = !state.firmwareSearchQuery;
+  const link = $("firmware-search-link");
+  link.hidden = !state.firmwareSearchQuery;
+  link.href = state.firmwareSearchQuery ? `https://www.google.com/search?q=${encodeURIComponent(state.firmwareSearchQuery)}` : "#";
+}
+
+async function createFingerprint(info) {
+  const identity = [
+    state.protocol || "unknown",
+    info.name || "",
+    info.manufacturer || "",
+    info.model || "",
+    info.serial || "",
+    info.firmware || "",
+    info.hardware || "",
+    info.software || "",
+    ...state.serviceUuids.slice().sort(),
+    ...state.characteristicUuids.slice().sort()
+  ].join("|");
+  try {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identity));
+    return bytesHex(new Uint8Array(digest)).slice(0, 16).toUpperCase();
+  } catch (error) {
+    return bytesHex(new TextEncoder().encode(identity)).slice(0, 16).toUpperCase();
+  }
+}
+
+async function readDeviceInformation() {
+  if (!state.server?.connected) { toast("Hãy kết nối thiết bị trước.", true); return; }
+  const button = $("read-device-info-button");
+  button.disabled = true;
+  $("device-info-status").textContent = "Đang đọc các characteristic chỉ đọc…";
+  const info = {
+    name: state.device?.name || "",
+    model: state.model ? `nRF52 model ${state.model}` : "",
+    firmware: state.firmwareVersion || "",
+    manufacturer: "", serial: "", hardware: "", software: "",
+    sources: []
+  };
+  try {
+    const service = await state.server.getPrimaryService(UUID.DEVICE_INFO_SERVICE);
+    const fields = [
+      ["model", UUID.MODEL_CHARACTERISTIC],
+      ["serial", UUID.SERIAL_CHARACTERISTIC],
+      ["firmware", UUID.FIRMWARE_CHARACTERISTIC],
+      ["hardware", UUID.HARDWARE_CHARACTERISTIC],
+      ["software", UUID.SOFTWARE_CHARACTERISTIC],
+      ["manufacturer", UUID.MANUFACTURER_CHARACTERISTIC]
+    ];
+    for (const [field, uuid] of fields) {
+      try {
+        info[field] = await readGattText(service, uuid);
+        info.sources.push(shortUuid(uuid));
+        addLog(`Device Info ${shortUuid(uuid)}: ${info[field]}`, "success");
+      } catch (error) {
+        addLog(`Device Info ${shortUuid(uuid)} không có hoặc không đọc được.`);
+      }
+    }
+  } catch (error) {
+    addLog("Thiết bị không công bố Device Information Service 0x180A.");
+  }
+
+  if (!info.firmware && state.protocol === PROTOCOL.NRF52) {
+    try {
+      const service = await state.server.getPrimaryService(UUID.NRF_SERVICE);
+      await readNrfVersion(service);
+      info.firmware = state.firmwareVersion || "";
+      if (info.firmware) info.sources.push("62750003");
+    } catch (error) {
+      addLog("Không đọc được characteristic phiên bản riêng của nRF52.");
+    }
+  }
+
+  const einkName = info.name.match(/(?:EINK|IOT47)[-_]?V([0-9A-Za-z._-]+)/i);
+  if (!info.firmware && einkName) {
+    info.firmware = `Tên quảng bá: V${einkName[1]}`;
+    info.sources.push("Bluetooth name");
+  }
+  info.fingerprint = await createFingerprint(info);
+  state.deviceInfo = info;
+
+  const queryParts = [
+    info.name ? `"${info.name}"` : "",
+    info.manufacturer ? `"${info.manufacturer}"` : "",
+    info.model ? `"${info.model}"` : "",
+    info.firmware ? `"${info.firmware}"` : "",
+    state.protocol === PROTOCOL.NRF52 ? "nRF52" : "DA14585",
+    "eink 2.13 250x128 firmware"
+  ].filter(Boolean);
+  state.firmwareSearchQuery = queryParts.join(" ");
+  updateDeviceInfoUI();
+  $("device-info-status").textContent = info.sources.length
+    ? `Đã đọc xong từ ${info.sources.length} nguồn · chỉ đọc`
+    : "Thiết bị không công bố chuỗi phiên bản; đã tạo dấu vân tay từ GATT.";
+  addLog(`Dấu vân tay thiết bị: ${info.fingerprint}`, "success");
+  toast("Đã đọc thông tin thiết bị và firmware.");
+  button.disabled = false;
+}
+
+async function copyFirmwareSearchQuery() {
+  if (!state.firmwareSearchQuery) return;
+  try {
+    await navigator.clipboard.writeText(state.firmwareSearchQuery);
+    toast("Đã sao chép từ khóa tìm firmware.");
+  } catch (error) {
+    toast("Không sao chép được; hãy dùng nút Tìm trên Google.", true);
+  }
 }
 
 async function inspectGattCapabilities() {
@@ -256,6 +396,7 @@ function exportDiagnostics() {
     firmwareVersion: state.firmwareVersion, services: state.serviceUuids,
     characteristics: state.characteristicUuids,
     telinkFlashReadService: Boolean(state.dfu), firmwareReadVerified: state.firmwareReadVerified,
+    deviceInformation: state.deviceInfo, firmwareSearchQuery: state.firmwareSearchQuery,
     logs: state.logs.map((item) => ({ time: item.time.toISOString(), type: item.type, message: item.message }))
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -372,6 +513,7 @@ function resetConnection(keepDevice = true) {
   state.server = null; state.protocol = null; state.epd = null; state.serial = null; state.dfu = null;
   state.model = null; state.mode = null; state.mtu = null; state.firmwareVersion = null;
   state.serviceUuids = []; state.characteristicUuids = []; state.firmwareReadVerified = false;
+  state.deviceInfo = null; state.firmwareSearchQuery = "";
   if (!keepDevice) state.device = null;
   updateDeviceUI();
 }
@@ -553,7 +695,7 @@ async function uploadDaImage() {
 }
 
 
-const DESIGN_TEMPLATE_NAMES = { clock: "Ảnh đồng hồ", calendar: "Lịch tháng", lunar: "Âm lịch", navigation: "Chỉ đường" };
+const DESIGN_TEMPLATE_NAMES = { clock: "Ảnh đồng hồ", calendar: "Lịch tháng", lunar: "Âm lịch" };
 
 function designColor() {
   return document.querySelector('input[name="design-color"]:checked')?.value || "#111111";
@@ -702,18 +844,10 @@ function renderDesigner() {
     designText(dc, `Ngày ${lunar.day}`, 84, 60, 155, Math.max(25, fontSize), { color: "#111" });
     designText(dc, `Tháng ${lunar.month}${lunar.leap ? " nhuận" : ""} · ${lunar.year}`, 84, 82, 155, 12, { color: accent });
     designText(dc, subtitle, 84, 109, 155, 9, { weight: 500 });
-  } else {
-    dc.fillStyle = accent; dc.fillRect(0, 0, 76, 128);
-    designText(dc, $("design-direction").value, 38, 78, 68, 55, { color: "#fff", align: "center", family: "system-ui" });
-    designText(dc, $("design-distance").value || "200 m", 87, 47, 150, Math.max(24, fontSize), { color: "#111" });
-    designText(dc, $("design-road").value || "Đường phía trước", 87, 74, 150, 14, { color: accent });
-    designText(dc, title, 87, 98, 150, 10);
-    designText(dc, subtitle, 87, 116, 150, 8, { weight: 500 });
   }
 
   if (state.designSymbol) designText(dc, state.designSymbol, 237, 119, 25, 18, { color: accent, align: "right" });
   $("design-template-label").textContent = DESIGN_TEMPLATE_NAMES[state.designTemplate];
-  $("navigation-fields").hidden = state.designTemplate !== "navigation";
   const isStaticClock = state.designTemplate === "clock";
   $("static-clock-warning").hidden = !isStaticClock;
   $("native-clock-button").hidden = !isStaticClock;
@@ -790,6 +924,8 @@ function bindEvents() {
   $("open-log-button").addEventListener("click",()=>showTab("log-panel"));
   $("clear-log-button").addEventListener("click",()=>{state.logs=[];renderLogs();});
   $("export-log-button").addEventListener("click",exportDiagnostics);
+  $("read-device-info-button").addEventListener("click",readDeviceInformation);
+  $("copy-firmware-search-button").addEventListener("click",copyFirmwareSearchQuery);
   $("firmware-test-button").addEventListener("click",testFirmwareRead);
   $("firmware-backup-button").addEventListener("click",backupFirmware);
   $("advanced-toggle").addEventListener("click",()=>{const open=$("advanced-content").hidden;$("advanced-content").hidden=!open;$("advanced-toggle").setAttribute("aria-expanded",String(open));});
@@ -806,7 +942,7 @@ function bindEvents() {
     document.querySelectorAll("[data-design-template]").forEach((item)=>item.classList.toggle("active",item===button));
     renderDesigner();
   }));
-  ["design-title","design-subtitle","design-font","design-size","design-direction","design-distance","design-road"].forEach((id)=>{
+  ["design-title","design-subtitle","design-font","design-size"].forEach((id)=>{
     $(id).addEventListener("input",renderDesigner); $(id).addEventListener("change",renderDesigner);
   });
   document.querySelectorAll('input[name="design-color"]').forEach((input)=>input.addEventListener("change",renderDesigner));
