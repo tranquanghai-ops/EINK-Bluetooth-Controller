@@ -277,3 +277,43 @@ input[type="range"] { accent-color: var(--red); }
 @media (max-width: 600px) {
   .firmware-info-actions .button { flex: 1 1 100%; }
 }
+
+/* nRF52 safe mode explorer */
+.mode-explorer { margin-top: 16px; border-color: #e5c7c2; background: linear-gradient(135deg,#fff 0%,#fffaf8 100%); }
+.explorer-layout { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: end; }
+.explorer-copy p { max-width: 720px; margin: 6px 0 12px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.safe-check { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; cursor: pointer; }
+.safe-check input { accent-color: var(--red); }
+.explorer-controls { display: grid; grid-template-columns: 120px auto auto; gap: 8px; align-items: end; }
+.explorer-controls label { display: grid; gap: 5px; color: var(--muted); font-size: 10px; font-weight: 750; }
+.explorer-controls select { min-height: 42px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: white; font: inherit; }
+.explorer-status { margin: 14px 0 0; padding: 10px 12px; color: #5d4a45; background: #f5ebe7; border-radius: 9px; font-size: 10px; }
+
+/* Interactive template designer */
+.object-tools { background: #f8f7f4; margin: 0 -10px; padding: 14px 10px !important; border-radius: 12px; }
+.inline-add { display: grid; grid-template-columns: 1fr auto; gap: 7px; }
+.inline-add input { min-width: 0; }
+.file-button { display: flex !important; align-items: center; justify-content: center; color: var(--ink) !important; cursor: pointer; }
+.selection-tools { padding: 14px !important; border: 1px solid #d9c4bf !important; border-radius: 12px; background: var(--red-soft); }
+.selection-tools h3 { color: var(--red-dark); }
+.selection-tools label > span { float: right; color: var(--ink); }
+.nudge-grid { width: 126px; margin: 10px auto; display: grid; grid-template-columns: repeat(3, 38px); gap: 6px; }
+.nudge-grid button { width: 38px; height: 34px; border: 1px solid var(--line); border-radius: 8px; background: white; cursor: pointer; font-weight: 800; }
+.nudge-grid button:hover { border-color: var(--red); color: var(--red); }
+.layer-actions { display: grid; grid-template-columns: repeat(2,1fr); gap: 7px; }
+.layer-actions .button { padding-inline: 8px; }
+.canvas-hint { margin: -5px 0 0; text-align: center; color: var(--muted); font-size: 10px; }
+#design-canvas { touch-action: none; cursor: crosshair; }
+#design-canvas.has-selection { cursor: move; }
+.countdown-fields .field-help { margin: 0; color: #78615b; font-size: 9px; line-height: 1.5; }
+
+@media (max-width: 900px) {
+  .explorer-layout { grid-template-columns: 1fr; }
+  .explorer-controls { grid-template-columns: 1fr 1fr; }
+  .explorer-controls label { grid-column: 1 / -1; }
+}
+@media (max-width: 560px) {
+  .explorer-controls { grid-template-columns: 1fr; }
+  .explorer-controls label { grid-column: auto; }
+  .inline-add { grid-template-columns: 1fr; }
+}
