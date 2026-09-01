@@ -156,10 +156,14 @@
             <div class="tool-section">
               <h3>Mẫu hiển thị</h3>
               <div class="template-grid">
-                <button class="template-button active" type="button" data-design-template="clock"><span>07:48</span><strong>Đồng hồ</strong></button>
+                <button class="template-button active" type="button" data-design-template="clock"><span>07:48</span><strong>Ảnh đồng hồ</strong></button>
                 <button class="template-button" type="button" data-design-template="calendar"><span>31</span><strong>Lịch tháng</strong></button>
                 <button class="template-button" type="button" data-design-template="lunar"><span>ÂL</span><strong>Âm lịch</strong></button>
                 <button class="template-button" type="button" data-design-template="navigation"><span>↱</span><strong>Chỉ đường</strong></button>
+              </div>
+              <div class="static-clock-warning" id="static-clock-warning">
+                <strong>Đây là ảnh giờ hiện tại, không phải đồng hồ tự chạy.</strong>
+                <span>Sau khi truyền ảnh, giờ trên ảnh sẽ đứng yên. Hãy chọn “Đồng hồ tự chạy” để dùng chế độ đồng hồ trong firmware.</span>
               </div>
             </div>
 
@@ -187,7 +191,8 @@
             </div>
 
             <div class="designer-actions">
-              <button class="button button-primary" id="design-use-button" type="button">Dùng thiết kế này</button>
+              <button class="button button-primary" id="design-use-button" type="button">Dùng ảnh giờ hiện tại</button>
+              <button class="button button-secondary" id="native-clock-button" type="button">Đồng hồ tự chạy</button>
               <button class="button button-ghost" id="design-reset-button" type="button">Đặt lại</button>
             </div>
           </aside>
@@ -281,6 +286,11 @@
       <button type="button" id="open-log-button">Xem đầy đủ</button>
     </section>
   </main>
+
+  <footer class="app-footer">
+    <span>Phát triển bởi <strong>ThS. Trần Quang Hải</strong></span>
+    <span>Phiên bản Web 1.2.1</span>
+  </footer>
 
   <div class="toast-region" id="toast-region" aria-live="polite"></div>
   <script src="app.js"></script>
