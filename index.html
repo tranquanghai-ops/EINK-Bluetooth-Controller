@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#101820">
   <meta name="description" content="Điều khiển màn hình E-Ink 2.13 inch qua Bluetooth, hỗ trợ DA14585 và nRF52.">
   <title>E-Ink Bluetooth Controller</title>
-  <link rel="stylesheet" href="styles.css?v=1.3.2">
+  <link rel="stylesheet" href="styles.css?v=1.4.0">
 </head>
 <body>
   <header class="app-header">
@@ -17,7 +17,7 @@
         <p>Điều khiển Bluetooth cho DA14585 và nRF52</p>
       </div>
     </div>
-    <div class="header-chip">Web 1.3 · Xử lý cục bộ</div>
+    <div class="header-chip">Web 1.4 · Studio thiết kế</div>
   </header>
 
   <main class="app-shell">
@@ -106,6 +106,23 @@
           </article>
         </div>
 
+        <article class="panel-card mode-explorer nrf-only" id="nrf-mode-explorer" hidden>
+          <div class="card-heading"><div class="card-icon">⌁</div><div><h3>Khảo sát chế độ ẩn</h3><p>Thử có kiểm soát các mode chưa được firmware công bố.</p></div></div>
+          <div class="explorer-layout">
+            <div class="explorer-copy">
+              <strong>Chỉ dành cho nRF52 firmware 0x26</strong>
+              <p>Ứng dụng chỉ gửi lệnh đặt giờ với mode 4–8; không ghi Flash và không OTA. Nếu màn hình hiển thị bất thường, bấm “Quay về Lịch”.</p>
+              <label class="safe-check"><input id="mode-risk-ack" type="checkbox"> Tôi hiểu đây là chế độ thử nghiệm.</label>
+            </div>
+            <div class="explorer-controls">
+              <label>Mode muốn thử<select id="experimental-mode"><option value="4">Mode 4</option><option value="5">Mode 5</option><option value="6">Mode 6</option><option value="7">Mode 7</option><option value="8">Mode 8</option></select></label>
+              <button class="button button-danger" id="test-mode-button" type="button" disabled>Thử mode đã chọn</button>
+              <button class="button button-secondary" id="restore-calendar-button" type="button">Quay về Lịch</button>
+            </div>
+          </div>
+          <p class="explorer-status" id="mode-explorer-status">Chưa thử mode ẩn nào trong phiên này.</p>
+        </article>
+
         <article class="panel-card advanced-card da-only" id="da-advanced">
           <button class="advanced-toggle" id="advanced-toggle" type="button" aria-expanded="false">
             <span><strong>Cài đặt nâng cao cho DA14585</strong><small>Hiệu chỉnh độ đậm và thời gian ngừng cập nhật</small></span><b>⌄</b>
@@ -159,6 +176,8 @@
                 <button class="template-button active" type="button" data-design-template="clock"><span>07:48</span><strong>Ảnh đồng hồ</strong></button>
                 <button class="template-button" type="button" data-design-template="calendar"><span>31</span><strong>Lịch tháng</strong></button>
                 <button class="template-button" type="button" data-design-template="lunar"><span>ÂL</span><strong>Âm lịch</strong></button>
+                <button class="template-button" type="button" data-design-template="countdown"><span>25</span><strong>Đếm ngược</strong></button>
+                <button class="template-button" type="button" data-design-template="blank"><span>＋</span><strong>Trang trắng</strong></button>
               </div>
               <div class="static-clock-warning" id="static-clock-warning">
                 <strong>Đây là ảnh giờ hiện tại, không phải đồng hồ tự chạy.</strong>
@@ -179,6 +198,40 @@
               </fieldset>
             </div>
 
+            <div class="tool-section designer-fields countdown-fields" id="countdown-fields" hidden>
+              <h3>Thiết lập đếm ngược</h3>
+              <label>Ngày sự kiện<input id="countdown-date" type="date"></label>
+              <label>Nhãn hiển thị<input id="countdown-label" type="text" maxlength="20" value="NGÀY CÒN LẠI"></label>
+              <p class="field-help">Mẫu này là ảnh tĩnh. Firmware phải có mode riêng thì số ngày mới tự đổi trên thiết bị.</p>
+            </div>
+
+            <div class="tool-section object-tools">
+              <h3>Thêm và di chuyển nội dung</h3>
+              <div class="designer-fields">
+                <div class="inline-add"><input id="element-text" type="text" maxlength="60" placeholder="Nhập chữ muốn thêm"><button class="button button-secondary" id="add-text-button" type="button">Thêm chữ</button></div>
+                <div class="inline-add"><input id="qr-content" type="url" placeholder="https://..." value="https://"><button class="button button-secondary" id="add-qr-button" type="button">Tạo QR</button></div>
+                <label class="button button-ghost file-button">Thêm hình ảnh<input id="element-image-file" type="file" accept="image/png,image/jpeg,image/webp" hidden></label>
+              </div>
+            </div>
+
+            <div class="tool-section selection-tools" id="selection-tools" hidden>
+              <h3>Đối tượng đang chọn</h3>
+              <div class="designer-fields">
+                <label>Kích thước <span id="object-size-output">100%</span><input id="object-size" type="range" min="25" max="200" value="100"></label>
+                <label>Xoay <span id="object-rotate-output">0°</span><input id="object-rotate" type="range" min="-180" max="180" value="0"></label>
+              </div>
+              <div class="nudge-grid" aria-label="Di chuyển đối tượng">
+                <span></span><button type="button" data-nudge="0,-1">↑</button><span></span>
+                <button type="button" data-nudge="-1,0">←</button><button type="button" data-nudge="0,1">↓</button><button type="button" data-nudge="1,0">→</button>
+              </div>
+              <div class="layer-actions">
+                <button class="button button-ghost" id="duplicate-object-button" type="button">Nhân bản</button>
+                <button class="button button-ghost" id="send-back-button" type="button">Ra sau</button>
+                <button class="button button-ghost" id="bring-front-button" type="button">Lên trước</button>
+                <button class="button button-danger" id="delete-object-button" type="button">Xóa</button>
+              </div>
+            </div>
+
             <div class="designer-actions">
               <button class="button button-primary" id="design-use-button" type="button">Dùng ảnh giờ hiện tại</button>
               <button class="button button-secondary" id="native-clock-button" type="button">Đồng hồ tự chạy</button>
@@ -189,6 +242,7 @@
           <article class="designer-preview panel-card">
             <div class="preview-top"><span>Xem trước 1:1</span><span id="design-template-label">Đồng hồ</span></div>
             <div class="screen-frame designer-screen"><canvas id="design-canvas" width="250" height="128" aria-label="Bản xem trước thiết kế"></canvas></div>
+            <p class="canvas-hint">Chạm hoặc bấm vào chữ, QR hay hình ảnh rồi kéo đến vị trí mong muốn.</p>
             <div class="quick-symbols" aria-label="Biểu tượng nhanh">
               <span>Biểu tượng:</span>
               <button type="button" data-design-symbol="☀">☀</button><button type="button" data-design-symbol="☁">☁</button>
@@ -297,10 +351,11 @@
 
   <footer class="app-footer">
     <span>Phát triển bởi <strong>ThS. Trần Quang Hải</strong></span>
-    <span>Phiên bản Web 1.3.2</span>
+    <span>Phiên bản Web 1.4.0</span>
   </footer>
 
   <div class="toast-region" id="toast-region" aria-live="polite"></div>
-  <script src="app.js?v=1.3.2"></script>
+  <script src="vendor/qrcode.js?v=1.4.0"></script>
+  <script src="app.js?v=1.4.0"></script>
 </body>
 </html>
