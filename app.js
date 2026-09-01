@@ -27,7 +27,7 @@ const state = {
   device: null, server: null, protocol: null, epd: null, serial: null,
   model: null, mode: null, mtu: null, chunkSize: 128, logs: [],
   image: null, rotation: 0, fit: "contain", imageReady: false, sending: false,
-  firmwareVersion: null, serviceUuids: [], characteristicUuids: [], dfu: null,
+  firmwareVersion: null, firmwareVersionCode: null, serviceUuids: [], characteristicUuids: [], dfu: null,
   dfuPending: null, firmwareReadVerified: false, backupRunning: false,
   designTemplate: "clock", designSymbol: "",
   deviceInfo: null, firmwareSearchQuery: ""
@@ -245,7 +245,8 @@ async function readDeviceInformation() {
     info.manufacturer ? `"${info.manufacturer}"` : "",
     info.model ? `"${info.model}"` : "",
     info.firmware ? `"${info.firmware}"` : "",
-    state.protocol === PROTOCOL.NRF52 ? "nRF52" : "DA14585",
+    state.firmwareVersionCode !== null ? `firmware 0x${toHex(state.firmwareVersionCode)}` : "",
+    state.protocol === PROTOCOL.NRF52 ? "nRF52 EPD-nRF5" : "DA14585",
     "eink 2.13 250x128 firmware"
   ].filter(Boolean);
   state.firmwareSearchQuery = queryParts.join(" ");
@@ -307,11 +308,17 @@ async function readNrfVersion(service) {
     const characteristic = await service.getCharacteristic(UUID.NRF_VERSION_CHARACTERISTIC);
     const value = await characteristic.readValue();
     const data = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-    const printable = new TextDecoder().decode(data).replace(/\0/g, "").trim();
-    state.firmwareVersion = printable && /^[\x20-\x7e]+$/.test(printable) ? printable : bytesHex(data);
+    if (data.length === 1) {
+      state.firmwareVersionCode = data[0];
+      state.firmwareVersion = `0x${toHex(data[0]).toUpperCase()} · mã nội bộ ${data[0]}`;
+    } else {
+      const printable = new TextDecoder().decode(data).replace(/\0/g, "").trim();
+      state.firmwareVersionCode = null;
+      state.firmwareVersion = printable && /^[\x20-\x7e]+$/.test(printable) ? printable : `HEX: ${bytesHex(data)}`;
+    }
     addLog(`nRF52 firmware: ${state.firmwareVersion}`, "success");
   } catch (error) {
-    state.firmwareVersion = null;
+    state.firmwareVersion = null; state.firmwareVersionCode = null;
     addLog("nRF52 không cung cấp characteristic version.");
   }
 }
@@ -393,7 +400,7 @@ function exportDiagnostics() {
   const payload = {
     exportedAt: new Date().toISOString(), device: state.device?.name || null,
     protocol: state.protocol, model: state.model, mode: state.mode, mtu: state.mtu,
-    firmwareVersion: state.firmwareVersion, services: state.serviceUuids,
+    firmwareVersion: state.firmwareVersion, firmwareVersionCode: state.firmwareVersionCode, services: state.serviceUuids,
     characteristics: state.characteristicUuids,
     telinkFlashReadService: Boolean(state.dfu), firmwareReadVerified: state.firmwareReadVerified,
     deviceInformation: state.deviceInfo, firmwareSearchQuery: state.firmwareSearchQuery,
@@ -401,8 +408,9 @@ function exportDiagnostics() {
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
-  link.download = `eink-diagnostic-${Date.now()}.json`; link.click();
-  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  link.download = `eink-diagnostic-${Date.now()}.json`;
+  document.body.append(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(link.href), 60000);
 }
 
 async function writeEpd(bytes, withResponse = true) {
@@ -445,7 +453,7 @@ async function connectSelectedDevice(reuse = false) {
 }
 
 async function detectProtocol() {
-  state.protocol = null; state.epd = null; state.serial = null; state.model = null; state.mode = null; state.mtu = null; state.chunkSize = 128; state.firmwareVersion = null;
+  state.protocol = null; state.epd = null; state.serial = null; state.model = null; state.mode = null; state.mtu = null; state.chunkSize = 128; state.firmwareVersion = null; state.firmwareVersionCode = null;
   try {
     const service = await state.server.getPrimaryService(UUID.NRF_SERVICE);
     state.epd = await service.getCharacteristic(UUID.NRF_CHARACTERISTIC);
@@ -511,7 +519,7 @@ function handleDisconnect() {
 
 function resetConnection(keepDevice = true) {
   state.server = null; state.protocol = null; state.epd = null; state.serial = null; state.dfu = null;
-  state.model = null; state.mode = null; state.mtu = null; state.firmwareVersion = null;
+  state.model = null; state.mode = null; state.mtu = null; state.firmwareVersion = null; state.firmwareVersionCode = null;
   state.serviceUuids = []; state.characteristicUuids = []; state.firmwareReadVerified = false;
   state.deviceInfo = null; state.firmwareSearchQuery = "";
   if (!keepDevice) state.device = null;
