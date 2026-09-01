@@ -11,8 +11,9 @@ Trang điều khiển Web Bluetooth dành cho màn hình E-Ink 2,13 inch 250×12
 - Chỉ hiển thị nút tương thích với thiết bị đang sử dụng.
 - Đồng bộ ngày giờ và chuyển chế độ lịch/đồng hồ/ảnh.
 - Truyền ảnh 250×128 với xử lý ba màu đen–trắng–đỏ ngay trên trình duyệt.
-- Trình thiết kế cục bộ với mẫu đồng hồ, lịch tháng và âm lịch Việt Nam.
-- Tùy chỉnh tiêu đề, dòng phụ, kiểu/cỡ chữ, màu nhấn và biểu tượng rồi chuyển thẳng sang bước truyền ảnh.
+- Studio thiết kế cục bộ với mẫu đồng hồ, lịch tháng, âm lịch Việt Nam, đếm ngược và trang trắng.
+- Tạo QR từ liên kết; thêm chữ/hình, kéo thả, đổi kích thước, xoay, nhân bản và sắp lớp rồi chuyển thẳng sang bước truyền ảnh.
+- Khu vực khảo sát an toàn mode 4–8 cho nRF52 firmware 0x26, luôn có nút quay về mode Lịch và không ghi Flash.
 - Hiệu chỉnh DA14585 được đặt trong khu vực nâng cao và kiểm tra giá trị HEX.
 - Đọc thông tin firmware theo chuẩn Device Information Service 0x180A/0x2A24–0x2A29 và characteristic riêng của nRF52.
 - Tạo dấu vân tay thiết bị, từ khóa tìm firmware và xuất kèm trong tệp JSON chẩn đoán.
@@ -49,3 +50,7 @@ Các chức năng dựng nội dung không phụ thuộc Android đã được v
 Ứng dụng không gửi lệnh đọc Flash khi vừa kết nối. Khu vực sao lưu chỉ xuất hiện nếu thiết bị công bố đồng thời service `0000221f-...` và characteristic `0000331f-...`. Người dùng phải chạy kiểm tra đọc thành công trước khi nút tải bản sao được bật. Luồng này chỉ dùng lệnh đọc `0x04`; ứng dụng không triển khai lệnh xóa, ghi hoặc hoàn tất OTA.
 
 > Bản sao firmware của một thiết bị không nên nạp sang thiết bị khác nếu chưa xác nhận cùng chip, Flash layout, màn hình và bootloader.
+
+## Thành phần mã nguồn mở
+
+Mã QR được tạo cục bộ bằng [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) của Kazuhiko Arase (MIT License). Không gửi nội dung QR lên máy chủ.
