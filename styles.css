@@ -221,7 +221,7 @@ input[type="range"] { accent-color: var(--red); }
 .designer-tools .tool-section { padding: 0 0 18px; border-bottom: 1px solid #ece9e4; }
 .designer-tools .tool-section:last-of-type { padding-bottom: 0; border-bottom: 0; }
 .designer-tools h3 { margin: 0 0 11px; font-size: 13px; }
-.template-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.template-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .template-button { min-width: 0; padding: 11px 6px 9px; border: 1px solid var(--line); border-radius: 12px; background: #faf9f7; cursor: pointer; transition: .18s ease; }
 .template-button:hover { border-color: var(--line-strong); transform: translateY(-1px); }
 .template-button.active { color: var(--red-dark); background: var(--red-soft); border-color: var(--red); box-shadow: 0 0 0 1px var(--red); }
@@ -229,19 +229,17 @@ input[type="range"] { accent-color: var(--red); }
 .template-button span { min-height: 25px; font: 800 18px/1 ui-monospace, monospace; }
 .template-button strong { margin-top: 6px; font-size: 10px; }
 .designer-fields { display: grid; gap: 10px; }
-.designer-fields label, .navigation-fields label { display: grid; gap: 6px; color: var(--muted); font-size: 10px; font-weight: 750; }
-.designer-fields input, .designer-fields select, .navigation-fields input, .navigation-fields select {
+.designer-fields label { display: grid; gap: 6px; color: var(--muted); font-size: 10px; font-weight: 750; }
+.designer-fields input, .designer-fields select {
   width: 100%; height: 40px; padding: 0 11px; color: var(--ink); background: white; border: 1px solid var(--line); border-radius: 10px;
 }
-.designer-fields input:focus, .designer-fields select:focus, .navigation-fields input:focus, .navigation-fields select:focus { outline: 2px solid rgba(189,45,50,.2); border-color: var(--red); }
+.designer-fields input:focus, .designer-fields select:focus { outline: 2px solid rgba(189,45,50,.2); border-color: var(--red); }
 .two-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .color-picker { display: flex; align-items: center; gap: 15px; margin: 2px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
 .color-picker legend { padding: 0 5px; color: var(--muted); font-size: 10px; font-weight: 750; }
 .color-picker label { display: flex; grid-template-columns: none; align-items: center; gap: 6px; color: var(--ink); cursor: pointer; }
 .swatch { width: 17px; height: 17px; border: 1px solid #bbb; border-radius: 50%; }
 .swatch.black { background: #111; }.swatch.red { background: #d61f26; }
-.navigation-fields { display: grid; gap: 10px; padding: 15px !important; background: #f8f7f4; border: 1px solid var(--line) !important; border-radius: 12px; }
-.field-note { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .designer-actions { display: flex; gap: 8px; }
 .designer-actions .button-primary { flex: 1; }
 .designer-preview { display: grid; gap: 16px; min-height: 430px; }
@@ -268,4 +266,14 @@ input[type="range"] { accent-color: var(--red); }
 @media (max-width: 600px) {
   .designer-actions .button { flex: 1 1 100%; }
   .app-footer { width: min(100% - 20px, 1180px); flex-direction: column; gap: 5px; margin-top: -34px; }
+}
+
+
+.device-info-card { grid-column: span 1; }
+.device-info-status { min-height: 35px; margin: 0 0 8px; padding: 10px 12px; color: #365b70; background: #edf5f8; border: 1px solid #cfdee5; border-radius: 10px; font-size: 11px; line-height: 1.5; }
+.firmware-info-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.firmware-info-actions .button { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+#info-fingerprint { color: var(--red-dark); font-weight: 800; letter-spacing: .06em; }
+@media (max-width: 600px) {
+  .firmware-info-actions .button { flex: 1 1 100%; }
 }
