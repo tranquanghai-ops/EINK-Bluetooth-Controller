@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#101820">
   <meta name="description" content="Điều khiển màn hình E-Ink 2.13 inch qua Bluetooth, hỗ trợ DA14585 và nRF52.">
   <title>E-Ink Bluetooth Controller</title>
-  <link rel="stylesheet" href="styles.css?v=1.4.0">
+  <link rel="stylesheet" href="styles.css?v=1.4.1">
 </head>
 <body>
   <header class="app-header">
@@ -81,9 +81,8 @@
           <article class="panel-card">
             <div class="card-heading"><div class="card-icon">◫</div><div><h3>Giao diện màn hình</h3><p>Chọn chế độ muốn hiển thị.</p></div></div>
             <div class="mode-grid" id="nrf-mode-controls" hidden>
-              <button class="mode-button" type="button" data-nrf-mode="1"><span>▦</span><strong>Lịch</strong><small>Tháng và đồng hồ</small></button>
-              <button class="mode-button" type="button" data-nrf-mode="2"><span>◷</span><strong>Đồng hồ 1</strong><small>Mặt số thứ nhất</small></button>
-              <button class="mode-button" type="button" data-nrf-mode="3"><span>◴</span><strong>Đồng hồ 2</strong><small>Mặt số thứ hai</small></button>
+              <button class="mode-button" type="button" data-nrf-mode="1" data-nrf-cycle="calendar"><span>▦</span><strong>Lịch · 2 mẫu</strong><small id="calendar-cycle-label">Bấm lại cùng nút để đổi mẫu</small></button>
+              <button class="mode-button" type="button" data-nrf-mode="2" data-nrf-cycle="clock"><span>◷</span><strong>Đồng hồ · 4 mặt</strong><small id="clock-cycle-label">Bấm lại cùng nút để đổi mặt</small></button>
               <button class="mode-button open-image" type="button"><span>▧</span><strong>Ảnh riêng</strong><small>Tải ảnh 250×128</small></button>
             </div>
             <div class="mode-grid" id="da-mode-controls" hidden>
@@ -105,23 +104,6 @@
             </div>
           </article>
         </div>
-
-        <article class="panel-card mode-explorer nrf-only" id="nrf-mode-explorer" hidden>
-          <div class="card-heading"><div class="card-icon">⌁</div><div><h3>Khảo sát chế độ ẩn</h3><p>Thử có kiểm soát các mode chưa được firmware công bố.</p></div></div>
-          <div class="explorer-layout">
-            <div class="explorer-copy">
-              <strong>Chỉ dành cho nRF52 firmware 0x26</strong>
-              <p>Ứng dụng chỉ gửi lệnh đặt giờ với mode 4–8; không ghi Flash và không OTA. Nếu màn hình hiển thị bất thường, bấm “Quay về Lịch”.</p>
-              <label class="safe-check"><input id="mode-risk-ack" type="checkbox"> Tôi hiểu đây là chế độ thử nghiệm.</label>
-            </div>
-            <div class="explorer-controls">
-              <label>Mode muốn thử<select id="experimental-mode"><option value="4">Mode 4</option><option value="5">Mode 5</option><option value="6">Mode 6</option><option value="7">Mode 7</option><option value="8">Mode 8</option></select></label>
-              <button class="button button-danger" id="test-mode-button" type="button" disabled>Thử mode đã chọn</button>
-              <button class="button button-secondary" id="restore-calendar-button" type="button">Quay về Lịch</button>
-            </div>
-          </div>
-          <p class="explorer-status" id="mode-explorer-status">Chưa thử mode ẩn nào trong phiên này.</p>
-        </article>
 
         <article class="panel-card advanced-card da-only" id="da-advanced">
           <button class="advanced-toggle" id="advanced-toggle" type="button" aria-expanded="false">
@@ -351,11 +333,11 @@
 
   <footer class="app-footer">
     <span>Phát triển bởi <strong>ThS. Trần Quang Hải</strong></span>
-    <span>Phiên bản Web 1.4.0</span>
+    <span>Phiên bản Web 1.4.1</span>
   </footer>
 
   <div class="toast-region" id="toast-region" aria-live="polite"></div>
-  <script src="vendor/qrcode.js?v=1.4.0"></script>
-  <script src="app.js?v=1.4.0"></script>
+  <script src="vendor/qrcode.js?v=1.4.1"></script>
+  <script src="app.js?v=1.4.1"></script>
 </body>
 </html>
