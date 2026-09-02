@@ -13,7 +13,8 @@ Trang điều khiển Web Bluetooth dành cho màn hình E-Ink 2,13 inch 250×12
 - Truyền ảnh 250×128 với xử lý ba màu đen–trắng–đỏ ngay trên trình duyệt.
 - Studio thiết kế cục bộ với mẫu đồng hồ, lịch tháng, âm lịch Việt Nam, đếm ngược và trang trắng.
 - Tạo QR từ liên kết; thêm chữ/hình, kéo thả, đổi kích thước, xoay, nhân bản và sắp lớp rồi chuyển thẳng sang bước truyền ảnh.
-- Khu vực khảo sát an toàn mode 4–8 cho nRF52 firmware 0x26, luôn có nút quay về mode Lịch và không ghi Flash.
+- Giao diện nRF52 đã xác nhận: cùng một nút Lịch luân phiên 2 mẫu, cùng một nút Đồng hồ luân phiên 4 mặt.
+- Không đưa mode 6 (màn hình khóa) và mode 8 (màn hình trắng) vào khu vực sử dụng thông thường.
 - Hiệu chỉnh DA14585 được đặt trong khu vực nâng cao và kiểm tra giá trị HEX.
 - Đọc thông tin firmware theo chuẩn Device Information Service 0x180A/0x2A24–0x2A29 và characteristic riêng của nRF52.
 - Tạo dấu vân tay thiết bị, từ khóa tìm firmware và xuất kèm trong tệp JSON chẩn đoán.
