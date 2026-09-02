@@ -31,6 +31,7 @@ const state = {
   dfuPending: null, firmwareReadVerified: false, backupRunning: false,
   designTemplate: "clock", designSymbol: "", designerElements: [], selectedElementId: null,
   nextElementId: 1, designerDrag: null,
+  nrfCycleClicks: { calendar: 0, clock: 0 },
   deviceInfo: null, firmwareSearchQuery: ""
 };
 
@@ -82,7 +83,14 @@ function showTab(panelId) {
 }
 
 function modeName(mode) {
-  return ({ 0: "Ảnh", 1: "Lịch", 2: "Đồng hồ 1", 3: "Đồng hồ 2" })[mode] || (mode >= 4 && mode <= 8 ? `Thử nghiệm ${mode}` : "Chưa rõ");
+  return ({ 0: "Ảnh", 1: "Lịch", 2: "Đồng hồ", 3: "Đồng hồ" })[mode] || "Chưa rõ";
+}
+
+function updateCycleLabels() {
+  const calendarClick = state.nrfCycleClicks.calendar;
+  const clockClick = state.nrfCycleClicks.clock;
+  $("calendar-cycle-label").textContent = calendarClick ? `Mẫu dự kiến ${((calendarClick - 1) % 2) + 1}/2 · bấm lại để đổi` : "Bấm lại cùng nút để đổi mẫu";
+  $("clock-cycle-label").textContent = clockClick ? `Mặt dự kiến ${((clockClick - 1) % 4) + 1}/4 · bấm lại để đổi` : "Bấm lại cùng nút để đổi mặt";
 }
 
 function updateDeviceUI() {
@@ -115,10 +123,9 @@ function updateDeviceUI() {
   $("da-mode-controls").hidden = isNrf;
   $("week-start-row").hidden = !isNrf;
   document.querySelectorAll(".da-only").forEach((element) => { element.hidden = isNrf; });
-  const supportsModeSurvey = isNrf && state.firmwareVersionCode === 0x26;
-  document.querySelectorAll(".nrf-only").forEach((element) => { element.hidden = !supportsModeSurvey; });
   $("image-device-label").textContent = isNrf ? `nRF52 model ${state.model ?? 2}` : "DA14585 Legacy";
   document.querySelectorAll("[data-nrf-mode]").forEach((button) => button.classList.toggle("active", Number(button.dataset.nrfMode) === state.mode));
+  updateCycleLabels();
   updateDiagnosticsUI();
 }
 
@@ -525,6 +532,7 @@ function resetConnection(keepDevice = true) {
   state.model = null; state.mode = null; state.mtu = null; state.firmwareVersion = null; state.firmwareVersionCode = null;
   state.serviceUuids = []; state.characteristicUuids = []; state.firmwareReadVerified = false;
   state.deviceInfo = null; state.firmwareSearchQuery = "";
+  state.nrfCycleClicks = { calendar: 0, clock: 0 };
   if (!keepDevice) state.device = null;
   updateDeviceUI();
 }
@@ -568,22 +576,14 @@ async function setNrfMode(mode) {
   } catch (error) { commandError(error); return false; }
 }
 
-async function testExperimentalMode() {
-  if (state.protocol !== PROTOCOL.NRF52) return toast("Chức năng này chỉ dành cho thiết bị nRF52.", true);
-  if (!$("mode-risk-ack").checked) return toast("Hãy xác nhận cảnh báo trước khi thử.", true);
-  const mode = Number($("experimental-mode").value);
-  if (!Number.isInteger(mode) || mode < 4 || mode > 8) return toast("Mode thử nghiệm không hợp lệ.", true);
+async function cycleNrfMode(kind, mode) {
   const sent = await setNrfMode(mode);
   if (!sent) return;
-  $("mode-explorer-status").textContent = `Đã gửi mode ${mode}. Hãy quan sát màn hình trong 1–2 phút; nếu không ổn, bấm “Quay về Lịch”.`;
-  addLog(`Khảo sát firmware: đã gửi mode ${mode}; không ghi Flash.`, "info");
-}
-
-async function restoreCalendarMode() {
-  if (state.protocol !== PROTOCOL.NRF52) return;
-  const sent = await setNrfMode(1);
-  if (!sent) return;
-  $("mode-explorer-status").textContent = "Đã quay về mode 1 · Lịch.";
+  state.nrfCycleClicks[kind] += 1;
+  updateCycleLabels();
+  const total = kind === "calendar" ? 2 : 4;
+  const current = ((state.nrfCycleClicks[kind] - 1) % total) + 1;
+  addLog(`${kind === "calendar" ? "Lịch" : "Đồng hồ"}: lần chọn ${current}/${total} theo vòng lặp firmware.`, "success");
 }
 
 async function refreshScreen() {
@@ -1105,7 +1105,7 @@ function bindEvents() {
   $("toggle-color-button").addEventListener("click",()=>writeSerialHex("e4",true).catch(commandError));
   $("invert-button").addEventListener("click",()=>writeSerialHex("e3").catch(commandError));
   $("rotate-device-button").addEventListener("click",()=>writeSerialHex("e5").catch(commandError));
-  document.querySelectorAll("[data-nrf-mode]").forEach((button)=>button.addEventListener("click",()=>setNrfMode(Number(button.dataset.nrfMode))));
+  document.querySelectorAll("[data-nrf-cycle]").forEach((button)=>button.addEventListener("click",()=>cycleNrfMode(button.dataset.nrfCycle,Number(button.dataset.nrfMode))));
   document.querySelectorAll("[data-da-command]").forEach((button)=>button.addEventListener("click",()=>writeSerialHex(button.dataset.daCommand,true).catch(commandError)));
   document.querySelectorAll("[data-da-direct]").forEach((button)=>button.addEventListener("click",()=>writeSerialHex(button.dataset.daDirect).catch(commandError)));
   document.querySelectorAll(".open-image").forEach((button)=>button.addEventListener("click",()=>showTab("image-panel")));
@@ -1120,9 +1120,6 @@ function bindEvents() {
   $("advanced-toggle").addEventListener("click",()=>{const open=$("advanced-content").hidden;$("advanced-content").hidden=!open;$("advanced-toggle").setAttribute("aria-expanded",String(open));});
   $("calibration-value").addEventListener("input",validateCalibration);$("calibrate-button").addEventListener("click",calibrateDa);
   $("sleep-on-button").addEventListener("click",()=>setSleep(true));$("sleep-off-button").addEventListener("click",()=>setSleep(false));
-  $("mode-risk-ack").addEventListener("change",()=>{$("test-mode-button").disabled=!$("mode-risk-ack").checked;});
-  $("test-mode-button").addEventListener("click",()=>testExperimentalMode().catch(commandError));
-  $("restore-calendar-button").addEventListener("click",()=>restoreCalendarMode().catch(commandError));
   $("image-file").addEventListener("change",(event)=>loadImageFile(event.target.files[0]));
   const zone=$("drop-zone");["dragenter","dragover"].forEach((name)=>zone.addEventListener(name,(event)=>{event.preventDefault();zone.classList.add("dragover");}));["dragleave","drop"].forEach((name)=>zone.addEventListener(name,(event)=>{event.preventDefault();zone.classList.remove("dragover");}));zone.addEventListener("drop",(event)=>loadImageFile(event.dataTransfer.files[0]));
   document.querySelectorAll("[data-fit]").forEach((button)=>button.addEventListener("click",()=>{state.fit=button.dataset.fit;document.querySelectorAll("[data-fit]").forEach((b)=>b.classList.toggle("active",b===button));drawImage();}));
