@@ -22,6 +22,17 @@ const UUID = {
 };
 const NRF_CMD = { INIT: 0x01, CLEAR: 0x02, REFRESH: 0x05, SLEEP: 0x06, SET_TIME: 0x20, WEEK_START: 0x21, WRITE_IMAGE: 0x30 };
 const OPTIONAL_SERVICES = [UUID.NRF_SERVICE, UUID.DA_SERIAL_SERVICE, UUID.DA_LEGACY_SERVICE, UUID.DA_DFU_SERVICE, UUID.DEVICE_INFO_SERVICE, UUID.IOT47_SERVICE];
+const DEVICE_FILTERS = [
+  { services: [UUID.NRF_SERVICE] },
+  { services: [UUID.DA_SERIAL_SERVICE] },
+  { services: [UUID.DA_LEGACY_SERVICE] },
+  { namePrefix: "NRF_EPD_" },
+  { namePrefix: "DLG-CLOCK-" }
+];
+const NRF_LAYOUTS = {
+  calendar: { mode: 1, label: "Lịch", names: ["Lịch dương", "Lịch âm"] },
+  clock: { mode: 2, label: "Đồng hồ", names: ["Đồng hồ số", "Lịch + giờ lớn", "Lịch + giờ chia ô", "Lịch + đồng hồ kim"] }
+};
 
 const state = {
   device: null, server: null, protocol: null, epd: null, serial: null,
@@ -31,7 +42,8 @@ const state = {
   dfuPending: null, firmwareReadVerified: false, backupRunning: false,
   designTemplate: "clock", designSymbol: "", designerElements: [], selectedElementId: null,
   nextElementId: 1, designerDrag: null,
-  nrfCycleClicks: { calendar: 0, clock: 0 },
+  nrfLayoutIndex: { calendar: null, clock: null },
+  nrfLayoutSwitching: false,
   deviceInfo: null, firmwareSearchQuery: ""
 };
 
@@ -86,11 +98,38 @@ function modeName(mode) {
   return ({ 0: "Ảnh", 1: "Lịch", 2: "Đồng hồ", 3: "Đồng hồ" })[mode] || "Chưa rõ";
 }
 
-function updateCycleLabels() {
-  const calendarClick = state.nrfCycleClicks.calendar;
-  const clockClick = state.nrfCycleClicks.clock;
-  $("calendar-cycle-label").textContent = calendarClick ? `Mẫu dự kiến ${((calendarClick - 1) % 2) + 1}/2 · bấm lại để đổi` : "Bấm lại cùng nút để đổi mẫu";
-  $("clock-cycle-label").textContent = clockClick ? `Mặt dự kiến ${((clockClick - 1) % 4) + 1}/4 · bấm lại để đổi` : "Bấm lại cùng nút để đổi mặt";
+function layoutStorageKey() {
+  return state.device ? `eink-layout:${state.device.id || state.device.name || "unknown"}` : null;
+}
+
+function loadNrfLayoutState() {
+  state.nrfLayoutIndex = { calendar: null, clock: null };
+  const key = layoutStorageKey();
+  if (!key) return;
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) || "null");
+    for (const kind of Object.keys(NRF_LAYOUTS)) {
+      if (Number.isInteger(saved?.[kind]) && saved[kind] >= 0 && saved[kind] < NRF_LAYOUTS[kind].names.length) state.nrfLayoutIndex[kind] = saved[kind];
+    }
+  } catch (error) { addLog("Không đọc được vị trí giao diện đã lưu; cần căn lại.", "error"); }
+}
+
+function saveNrfLayoutState() {
+  const key = layoutStorageKey();
+  if (key) localStorage.setItem(key, JSON.stringify(state.nrfLayoutIndex));
+}
+
+function updateNrfLayoutUI() {
+  document.querySelectorAll("[data-nrf-layout]").forEach((button) => {
+    const kind = button.dataset.nrfLayout;
+    const index = Number(button.dataset.layoutIndex);
+    button.classList.toggle("active", state.mode === NRF_LAYOUTS[kind].mode && state.nrfLayoutIndex[kind] === index);
+    button.disabled = state.nrfLayoutSwitching;
+  });
+  const known = Object.values(state.nrfLayoutIndex).filter(Number.isInteger).length;
+  $("layout-tracking-status").textContent = known === 2
+    ? "Đã nhớ vị trí của cả 2 nhóm. Chạm một mẫu để chuyển thẳng."
+    : "Firmware chỉ có lệnh chuyển tiếp. Hãy căn vị trí của từng nhóm một lần để chọn trực tiếp chính xác.";
 }
 
 function updateDeviceUI() {
@@ -124,8 +163,7 @@ function updateDeviceUI() {
   $("week-start-row").hidden = !isNrf;
   document.querySelectorAll(".da-only").forEach((element) => { element.hidden = isNrf; });
   $("image-device-label").textContent = isNrf ? `nRF52 model ${state.model ?? 2}` : "DA14585 Legacy";
-  document.querySelectorAll("[data-nrf-mode]").forEach((button) => button.classList.toggle("active", Number(button.dataset.nrfMode) === state.mode));
-  updateCycleLabels();
+  updateNrfLayoutUI();
   updateDiagnosticsUI();
 }
 
@@ -440,7 +478,7 @@ async function connectSelectedDevice(reuse = false) {
   try {
     if (!reuse) {
       addLog("Đang mở danh sách thiết bị Bluetooth…");
-      state.device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: OPTIONAL_SERVICES });
+      state.device = await navigator.bluetooth.requestDevice({ filters: DEVICE_FILTERS, optionalServices: OPTIONAL_SERVICES });
       state.device.addEventListener("gattserverdisconnected", handleDisconnect);
     }
     $("connect-button").disabled = true;
@@ -450,6 +488,7 @@ async function connectSelectedDevice(reuse = false) {
     addLog("Đã tìm thấy GATT server", "success");
     await inspectGattCapabilities();
     await detectProtocol();
+    if (state.protocol === PROTOCOL.NRF52) loadNrfLayoutState();
     updateDeviceUI();
     toast(`Đã kết nối ${state.protocol === PROTOCOL.NRF52 ? "nRF52" : "DA14585"}`);
   } catch (error) {
@@ -532,7 +571,8 @@ function resetConnection(keepDevice = true) {
   state.model = null; state.mode = null; state.mtu = null; state.firmwareVersion = null; state.firmwareVersionCode = null;
   state.serviceUuids = []; state.characteristicUuids = []; state.firmwareReadVerified = false;
   state.deviceInfo = null; state.firmwareSearchQuery = "";
-  state.nrfCycleClicks = { calendar: 0, clock: 0 };
+  state.nrfLayoutIndex = { calendar: null, clock: null };
+  state.nrfLayoutSwitching = false;
   if (!keepDevice) state.device = null;
   updateDeviceUI();
 }
@@ -564,26 +604,70 @@ async function syncTime() {
   } catch (error) { commandError(error); }
 }
 
-async function setNrfMode(mode) {
+async function setNrfMode(mode, announce = true) {
   try {
     const timestamp = Math.floor(Date.now() / 1000);
     const timezone = Math.round(-new Date().getTimezoneOffset() / 60);
     await writeEpd(new Uint8Array([NRF_CMD.WEEK_START, Number($("week-start").value)]));
     await writeEpd(new Uint8Array([NRF_CMD.SET_TIME, timestamp >>> 24, timestamp >>> 16, timestamp >>> 8, timestamp, timezone & 0xff, mode]));
     state.mode = mode; updateDeviceUI();
-    addLog(`Đã chuyển sang ${modeName(mode)}`, "success"); toast(`Đã chọn ${modeName(mode)}.`);
+    if (announce) { addLog(`Đã chuyển sang ${modeName(mode)}`, "success"); toast(`Đã chọn ${modeName(mode)}.`); }
     return true;
   } catch (error) { commandError(error); return false; }
 }
 
-async function cycleNrfMode(kind, mode) {
-  const sent = await setNrfMode(mode);
-  if (!sent) return;
-  state.nrfCycleClicks[kind] += 1;
-  updateCycleLabels();
-  const total = kind === "calendar" ? 2 : 4;
-  const current = ((state.nrfCycleClicks[kind] - 1) % total) + 1;
-  addLog(`${kind === "calendar" ? "Lịch" : "Đồng hồ"}: lần chọn ${current}/${total} theo vòng lặp firmware.`, "success");
+async function selectNrfLayout(kind, targetIndex) {
+  const group = NRF_LAYOUTS[kind];
+  const currentIndex = state.nrfLayoutIndex[kind];
+  if (!group || !Number.isInteger(targetIndex)) return;
+  if (state.nrfLayoutSwitching) return toast("Đang chuyển giao diện, vui lòng chờ.");
+  state.nrfLayoutSwitching = true;
+  updateNrfLayoutUI();
+  try {
+    if (!Number.isInteger(currentIndex)) {
+      const sent = await setNrfMode(group.mode, false);
+      if (!sent) return;
+      $("layout-current").value = `${kind}:0`;
+      $("layout-calibration").scrollIntoView({ behavior: "smooth", block: "center" });
+      addLog(`${group.label} chưa được căn: đã gửi 1 lần để hiện một mẫu cho người dùng ghi nhận.`, "info");
+      return toast(`Hãy nhìn màn hình, chọn đúng kiểu ${group.label} vừa hiện rồi bấm “Ghi nhận”.`);
+    }
+
+    const total = group.names.length;
+    let steps = (targetIndex - currentIndex + total) % total;
+    if (state.mode !== group.mode && steps === 0) steps = total;
+    if (steps === 0) return toast(`${group.names[targetIndex]} đang được chọn.`);
+
+    addLog(`Chuyển đến ${group.names[targetIndex]}: gửi ${steps} lần lệnh ${group.label}.`);
+    for (let step = 0; step < steps; step += 1) {
+      const sent = await setNrfMode(group.mode, false);
+      if (!sent) return;
+      state.nrfLayoutIndex[kind] = (state.nrfLayoutIndex[kind] + 1) % total;
+      saveNrfLayoutState();
+      if (step + 1 < steps) await delay(900);
+    }
+    state.nrfLayoutIndex[kind] = targetIndex;
+    saveNrfLayoutState();
+    addLog(`Đã đến ${group.names[targetIndex]} theo vị trí đã căn.`, "success");
+    toast(`Đã chọn ${group.names[targetIndex]}.`);
+  } finally {
+    state.nrfLayoutSwitching = false;
+    updateNrfLayoutUI();
+  }
+}
+
+function calibrateCurrentLayout() {
+  if (state.protocol !== PROTOCOL.NRF52) return;
+  const [kind, rawIndex] = $("layout-current").value.split(":");
+  const index = Number(rawIndex);
+  const group = NRF_LAYOUTS[kind];
+  if (!group || !Number.isInteger(index)) return;
+  state.nrfLayoutIndex[kind] = index;
+  state.mode = group.mode;
+  saveNrfLayoutState();
+  updateDeviceUI();
+  addLog(`Đã căn vị trí hiện tại: ${group.names[index]}.`, "success");
+  toast(`Đã ghi nhận ${group.names[index]}.`);
 }
 
 async function refreshScreen() {
@@ -1105,7 +1189,8 @@ function bindEvents() {
   $("toggle-color-button").addEventListener("click",()=>writeSerialHex("e4",true).catch(commandError));
   $("invert-button").addEventListener("click",()=>writeSerialHex("e3").catch(commandError));
   $("rotate-device-button").addEventListener("click",()=>writeSerialHex("e5").catch(commandError));
-  document.querySelectorAll("[data-nrf-cycle]").forEach((button)=>button.addEventListener("click",()=>cycleNrfMode(button.dataset.nrfCycle,Number(button.dataset.nrfMode))));
+  document.querySelectorAll("[data-nrf-layout]").forEach((button)=>button.addEventListener("click",()=>selectNrfLayout(button.dataset.nrfLayout,Number(button.dataset.layoutIndex))));
+  $("calibrate-layout-button").addEventListener("click",calibrateCurrentLayout);
   document.querySelectorAll("[data-da-command]").forEach((button)=>button.addEventListener("click",()=>writeSerialHex(button.dataset.daCommand,true).catch(commandError)));
   document.querySelectorAll("[data-da-direct]").forEach((button)=>button.addEventListener("click",()=>writeSerialHex(button.dataset.daDirect).catch(commandError)));
   document.querySelectorAll(".open-image").forEach((button)=>button.addEventListener("click",()=>showTab("image-panel")));
