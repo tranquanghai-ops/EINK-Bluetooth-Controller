@@ -85,16 +85,12 @@ button { color: inherit; }
 .card-heading p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
 .mode-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 9px; }
 #nrf-mode-controls { display: grid; gap: 16px; }
-.layout-group { display: grid; gap: 8px; }
-.layout-group-heading { display: flex; align-items: center; justify-content: space-between; }
-.layout-group-heading strong { font-size: 12px; }
-.layout-group-heading small { color: var(--muted); font-size: 10px; }
 .nrf-layout-grid { grid-template-columns: repeat(2,1fr); }
-.layout-calibration { display: grid; grid-template-columns: minmax(180px,1fr) minmax(190px,auto) auto; gap: 9px; align-items: center; padding: 12px; border: 1px dashed #c9b7b0; border-radius: 12px; background: #faf7f3; }
-.layout-calibration > div { display: grid; gap: 3px; }
-.layout-calibration strong { font-size: 11px; }
-.layout-calibration small { color: var(--muted); font-size: 9px; line-height: 1.4; }
-.layout-calibration select { min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; background: white; font: inherit; font-size: 11px; }
+.direct-mode-box { display: grid; gap: 10px; padding: 12px; border: 1px dashed #c9b7b0; border-radius: 12px; background: #faf7f3; }
+.direct-mode-box > div:first-child { display: grid; gap: 3px; }
+.direct-mode-box strong { font-size: 11px; }
+.direct-mode-box small { color: var(--muted); font-size: 9px; line-height: 1.4; }
+.direct-mode-buttons { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; }
 .image-mode-button { width: 100%; }
 .mode-button { min-height: 87px; padding: 13px; display: grid; grid-template-columns: 32px 1fr; grid-template-rows: auto auto; align-items: center; text-align: left; border: 1px solid var(--line); border-radius: 13px; background: #fbfaf8; cursor: pointer; transition: .18s ease; }
 .mode-button:hover { border-color: #c7a7a5; background: #fff; transform: translateY(-1px); }
@@ -313,5 +309,6 @@ input[type="range"] { accent-color: var(--red); }
 }
 
 @media (max-width: 760px) {
-  .nrf-layout-grid, .layout-calibration { grid-template-columns: 1fr; }
+  .nrf-layout-grid { grid-template-columns: 1fr; }
+  .direct-mode-buttons { grid-template-columns: repeat(2,1fr); }
 }

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#101820">
   <meta name="description" content="Điều khiển màn hình E-Ink 2.13 inch qua Bluetooth, hỗ trợ DA14585 và nRF52.">
   <title>E-Ink Bluetooth Controller</title>
-  <link rel="stylesheet" href="styles.css?v=1.5.0">
+  <link rel="stylesheet" href="styles.css?v=1.5.1">
 </head>
 <body>
   <header class="app-header">
@@ -81,17 +81,11 @@
           <article class="panel-card">
             <div class="card-heading"><div class="card-icon">◫</div><div><h3>Giao diện màn hình</h3><p>Chọn chế độ muốn hiển thị.</p></div></div>
             <div id="nrf-mode-controls" hidden>
-              <div class="layout-group"><div class="layout-group-heading"><strong>Lịch</strong><small>2 kiểu</small></div><div class="mode-grid nrf-layout-grid">
-                <button class="mode-button" type="button" data-nrf-layout="calendar" data-layout-index="0"><span>▦</span><strong>Lịch dương</strong><small>Tháng dương và ngày hiện tại</small></button>
-                <button class="mode-button" type="button" data-nrf-layout="calendar" data-layout-index="1"><span>☾</span><strong>Lịch âm</strong><small>Lịch tháng kèm ngày âm</small></button>
-              </div></div>
-              <div class="layout-group"><div class="layout-group-heading"><strong>Đồng hồ & lịch</strong><small>4 kiểu</small></div><div class="mode-grid nrf-layout-grid">
-                <button class="mode-button" type="button" data-nrf-layout="clock" data-layout-index="0"><span>◷</span><strong>Đồng hồ số</strong><small>Giờ lớn toàn màn hình</small></button>
-                <button class="mode-button" type="button" data-nrf-layout="clock" data-layout-index="1"><span>▥</span><strong>Lịch + giờ lớn</strong><small>Lịch trái, giờ lớn bên phải</small></button>
-                <button class="mode-button" type="button" data-nrf-layout="clock" data-layout-index="2"><span>▤</span><strong>Lịch + giờ chia ô</strong><small>Ngày và giờ trong các ô riêng</small></button>
-                <button class="mode-button" type="button" data-nrf-layout="clock" data-layout-index="3"><span>◴</span><strong>Lịch + đồng hồ kim</strong><small>Lịch trái, đồng hồ kim bên phải</small></button>
-              </div></div>
-              <div class="layout-calibration" id="layout-calibration"><div><strong>Căn vị trí giao diện</strong><small id="layout-tracking-status">Chọn đúng giao diện đang hiện trên thiết bị để web ghi nhớ.</small></div><select id="layout-current" aria-label="Giao diện đang hiển thị"><optgroup label="Lịch"><option value="calendar:0">Lịch dương</option><option value="calendar:1">Lịch âm</option></optgroup><optgroup label="Đồng hồ và lịch"><option value="clock:0">Đồng hồ số</option><option value="clock:1">Lịch + giờ lớn</option><option value="clock:2">Lịch + giờ chia ô</option><option value="clock:3">Lịch + đồng hồ kim</option></optgroup></select><button class="button button-secondary" id="calibrate-layout-button" type="button">Ghi nhận</button></div>
+              <div class="mode-grid nrf-layout-grid">
+                <button class="mode-button" type="button" data-nrf-mode="1"><span>▦</span><strong>Lịch dương</strong><small>Gửi trực tiếp Mode 1 · một lần</small></button>
+                <button class="mode-button" type="button" data-nrf-mode="2"><span>◷</span><strong>Đồng hồ</strong><small>Gửi trực tiếp Mode 2 · một lần</small></button>
+              </div>
+              <div class="direct-mode-box"><div><strong>Các mode chưa xác định</strong><small>Mỗi nút gửi trực tiếp đúng mode ghi trên nút, chỉ một lần. Sau khi xác định hình tương ứng sẽ đổi thành tên giao diện.</small></div><div class="direct-mode-buttons"><button class="button button-secondary" type="button" data-nrf-mode="3">Mode 3</button><button class="button button-secondary" type="button" data-nrf-mode="4">Mode 4</button><button class="button button-secondary" type="button" data-nrf-mode="5">Mode 5</button><button class="button button-secondary" type="button" data-nrf-mode="7">Mode 7</button></div></div>
               <button class="mode-button open-image image-mode-button" type="button"><span>▧</span><strong>Ảnh riêng</strong><small>Tải ảnh 250×128</small></button>
             </div>
             <div class="mode-grid" id="da-mode-controls" hidden>
@@ -342,11 +336,11 @@
 
   <footer class="app-footer">
     <span>Phát triển bởi <strong>ThS. Trần Quang Hải</strong></span>
-    <span>Phiên bản Web 1.5.0</span>
+    <span>Phiên bản Web 1.5.1</span>
   </footer>
 
   <div class="toast-region" id="toast-region" aria-live="polite"></div>
-  <script src="vendor/qrcode.js?v=1.5.0"></script>
-  <script src="app.js?v=1.5.0"></script>
+  <script src="vendor/qrcode.js?v=1.5.1"></script>
+  <script src="app.js?v=1.5.1"></script>
 </body>
 </html>

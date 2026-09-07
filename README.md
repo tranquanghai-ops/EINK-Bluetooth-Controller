@@ -13,8 +13,8 @@ Trang điều khiển Web Bluetooth dành cho màn hình E-Ink 2,13 inch 250×12
 - Truyền ảnh 250×128 với xử lý ba màu đen–trắng–đỏ ngay trên trình duyệt.
 - Studio thiết kế cục bộ với mẫu đồng hồ, lịch tháng, âm lịch Việt Nam, đếm ngược và trang trắng.
 - Tạo QR từ liên kết; thêm chữ/hình, kéo thả, đổi kích thước, xoay, nhân bản và sắp lớp rồi chuyển thẳng sang bước truyền ảnh.
-- Bộ chọn trực tiếp 2 kiểu Lịch và 4 kiểu Đồng hồ/lịch; web tính số lần gửi lệnh chuyển tiếp và lưu vị trí riêng cho từng thiết bị.
-- Căn lại vị trí từ giao diện đang hiển thị khi thiết bị đã được đổi bằng nút vật lý hoặc ứng dụng khác.
+- Mỗi nút nRF52 gửi trực tiếp đúng một giá trị mode đúng một lần, không đếm vòng và không tự gửi lặp.
+- Có nút thử trực tiếp mode 3, 4, 5 và 7 để tiếp tục xác định bảng chức năng firmware; không lưu vị trí tạm trong trình duyệt.
 - Danh sách Bluetooth được lọc theo service hỗ trợ hoặc tên `NRF_EPD_`/`DLG-CLOCK-` để ẩn bớt thiết bị không liên quan.
 - Không đưa mode 6 (màn hình khóa) và mode 8 (màn hình trắng) vào khu vực sử dụng thông thường.
 - Hiệu chỉnh DA14585 được đặt trong khu vực nâng cao và kiểm tra giá trị HEX.
