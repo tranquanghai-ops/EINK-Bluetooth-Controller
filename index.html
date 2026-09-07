@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#101820">
   <meta name="description" content="Điều khiển màn hình E-Ink 2.13 inch qua Bluetooth, hỗ trợ DA14585 và nRF52.">
   <title>E-Ink Bluetooth Controller</title>
-  <link rel="stylesheet" href="styles.css?v=1.5.3">
+  <link rel="stylesheet" href="styles.css?v=1.6.0">
 </head>
 <body>
   <header class="app-header">
@@ -81,20 +81,15 @@
           <article class="panel-card">
             <div class="card-heading"><div class="card-icon">◫</div><div><h3>Giao diện màn hình</h3><p>Chọn chế độ muốn hiển thị.</p></div></div>
             <div id="nrf-mode-controls" hidden>
-              <div class="mode-grid nrf-layout-grid">
-                <button class="mode-button" type="button" data-nrf-mode="1"><span>▦</span><strong>Lịch dương</strong><small>Gửi trực tiếp Mode 1 · một lần</small></button>
-                <button class="mode-button" type="button" data-nrf-mode="2"><span>◷</span><strong>Đồng hồ</strong><small>Gửi trực tiếp Mode 2 · một lần</small></button>
-                <button class="mode-button" type="button" data-nrf-mode="3"><span>▥</span><strong>Lịch + giờ lớn</strong><small>Gửi trực tiếp Mode 3 · một lần</small></button>
-                <button class="mode-button" type="button" data-nrf-mode="4"><span>▤</span><strong>Lịch + giờ chia ô</strong><small>Gửi trực tiếp Mode 4 · một lần</small></button>
-                <button class="mode-button" type="button" data-nrf-mode="5"><span>▣</span><strong>Lịch + đồng hồ số</strong><small>Gửi trực tiếp Mode 5 · một lần</small></button>
-                <button class="mode-button" type="button" data-nrf-mode="7"><span>☾</span><strong>Lịch âm</strong><small>Gửi trực tiếp Mode 7 · một lần</small></button>
-              </div>
+              <div class="display-mode-group"><div class="display-mode-heading"><strong>Lịch</strong><small>Hai loại lịch</small></div><div class="mode-grid nrf-layout-grid"><button class="mode-button" type="button" data-nrf-mode="1"><span>▦</span><strong>Lịch dương</strong><small>Mode 1</small></button><button class="mode-button" type="button" data-nrf-mode="7"><span>☾</span><strong>Lịch âm</strong><small>Mode 7</small></button></div></div>
+              <div class="display-mode-group"><div class="display-mode-heading"><strong>Đồng hồ</strong><small>Chỉ hiển thị giờ</small></div><div class="mode-grid nrf-layout-grid single-mode-grid"><button class="mode-button" type="button" data-nrf-mode="2"><span>◷</span><strong>Đồng hồ</strong><small>Mode 2</small></button></div></div>
+              <div class="display-mode-group"><div class="display-mode-heading"><strong>Lịch + đồng hồ</strong><small>Ba kiểu kết hợp</small></div><div class="mode-grid nrf-layout-grid"><button class="mode-button" type="button" data-nrf-mode="3"><span>▥</span><strong>Lịch + giờ lớn</strong><small>Mode 3</small></button><button class="mode-button" type="button" data-nrf-mode="4"><span>▤</span><strong>Lịch + giờ chia ô</strong><small>Mode 4</small></button><button class="mode-button" type="button" data-nrf-mode="5"><span>▣</span><strong>Lịch + đồng hồ số</strong><small>Mode 5</small></button></div></div>
               <div class="mode-behavior-note"><strong>Chống nhảy giao diện</strong><small>Nếu mode đang hiển thị được bấm lại, web sẽ không gửi lệnh lần nữa vì firmware có thể tự chuyển sang kiểu khác.</small></div>
               <details class="all-mode-panel" open>
                 <summary>Thử nghiệm đầy đủ Mode 0–8</summary>
                 <p>Mỗi nút gửi đúng mode ghi trên nút một lần. Mode 6 mở màn hình khóa; Mode 8 có thể làm màn hình trắng.</p>
                 <div class="all-mode-grid">
-                  <button class="mode-test-button" type="button" data-nrf-mode="0"><strong>Mode 0</strong><small>Chế độ ảnh</small></button>
+                  <button class="mode-test-button mode-test-warning" type="button" data-nrf-mode="0"><strong>Mode 0</strong><small>Màn hình trắng</small></button>
                   <button class="mode-test-button" type="button" data-nrf-mode="1"><strong>Mode 1</strong><small>Lịch dương</small></button>
                   <button class="mode-test-button" type="button" data-nrf-mode="2"><strong>Mode 2</strong><small>Đồng hồ</small></button>
                   <button class="mode-test-button" type="button" data-nrf-mode="3"><strong>Mode 3</strong><small>Lịch + giờ lớn</small></button>
@@ -104,6 +99,7 @@
                   <button class="mode-test-button" type="button" data-nrf-mode="7"><strong>Mode 7</strong><small>Lịch âm</small></button>
                   <button class="mode-test-button mode-test-warning" type="button" data-nrf-mode="8"><strong>Mode 8</strong><small>Màn hình trắng</small></button>
                 </div>
+                <div class="extended-mode"><div><strong>Khảo sát Mode 9–255</strong><small>Dùng các nút nhanh hoặc nhập một mode bất kỳ.</small></div><div class="extended-mode-quick"><button class="button button-secondary" type="button" data-nrf-mode="9">Mode 9</button><button class="button button-secondary" type="button" data-nrf-mode="10">Mode 10</button><button class="button button-secondary" type="button" data-nrf-mode="11">Mode 11</button><button class="button button-secondary" type="button" data-nrf-mode="12">Mode 12</button></div><div class="extended-mode-input"><input id="custom-mode-number" type="number" min="9" max="255" value="13" aria-label="Số mode mở rộng"><button class="button button-primary" id="custom-mode-button" type="button">Gửi mode</button></div></div>
               </details>
               <button class="mode-button open-image image-mode-button" type="button"><span>▧</span><strong>Ảnh riêng</strong><small>Tải ảnh 250×128</small></button>
             </div>
@@ -273,6 +269,12 @@
               <h3>Căn ảnh</h3>
               <div class="segmented"><button type="button" data-fit="contain" class="active">Vừa khung</button><button type="button" data-fit="cover">Lấp đầy</button><button type="button" id="rotate-image-button">Xoay 90°</button></div>
             </div>
+            <div class="tool-section range-fields image-transform-tools">
+              <label><span>Phóng to <output id="image-zoom-output">100%</output></span><input id="image-zoom" type="range" min="25" max="400" value="100"></label>
+              <div class="image-position-heading"><span>Vị trí ảnh</span><output id="image-position-output">X 0 · Y 0</output></div>
+              <p class="image-drag-help">Kéo trực tiếp ảnh trong khung xem trước hoặc dùng các phím dưới đây.</p>
+              <div class="image-nudge-controls"><button type="button" data-image-nudge="0,-4" aria-label="Dịch ảnh lên">↑</button><button type="button" data-image-nudge="-4,0" aria-label="Dịch ảnh sang trái">←</button><button type="button" id="reset-image-position">Đặt lại</button><button type="button" data-image-nudge="4,0" aria-label="Dịch ảnh sang phải">→</button><button type="button" data-image-nudge="0,4" aria-label="Dịch ảnh xuống">↓</button></div>
+            </div>
             <div class="tool-section range-fields">
               <label><span>Độ sáng <output id="brightness-output">0</output></span><input id="brightness" type="range" min="-100" max="100" value="0"></label>
               <label><span>Tương phản <output id="contrast-output">100</output></span><input id="contrast" type="range" min="50" max="180" value="100"></label>
@@ -355,11 +357,11 @@
 
   <footer class="app-footer">
     <span>Phát triển bởi <strong>ThS. Trần Quang Hải</strong></span>
-    <span>Phiên bản Web 1.5.3</span>
+    <span>Phiên bản Web 1.6.0</span>
   </footer>
 
   <div class="toast-region" id="toast-region" aria-live="polite"></div>
-  <script src="vendor/qrcode.js?v=1.5.3"></script>
-  <script src="app.js?v=1.5.3"></script>
+  <script src="vendor/qrcode.js?v=1.6.0"></script>
+  <script src="app.js?v=1.6.0"></script>
 </body>
 </html>

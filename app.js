@@ -33,7 +33,7 @@ const DEVICE_FILTERS = [
 const state = {
   device: null, server: null, protocol: null, epd: null, serial: null,
   model: null, mode: null, mtu: null, chunkSize: 128, logs: [],
-  image: null, rotation: 0, fit: "contain", imageReady: false, sending: false,
+  image: null, rotation: 0, fit: "contain", imageZoom: 1, imageOffsetX: 0, imageOffsetY: 0, imageDrag: null, imageReady: false, sending: false,
   firmwareVersion: null, firmwareVersionCode: null, serviceUuids: [], characteristicUuids: [], dfu: null,
   dfuPending: null, firmwareReadVerified: false, backupRunning: false,
   designTemplate: "clock", designSymbol: "", designerElements: [], selectedElementId: null,
@@ -90,7 +90,8 @@ function showTab(panelId) {
 
 function modeName(mode) {
   return ({
-    0: "Ảnh",
+    [-1]: "Ảnh riêng",
+    0: "Màn hình trắng · Mode 0",
     1: "Lịch dương · Mode 1",
     2: "Đồng hồ · Mode 2",
     3: "Lịch + giờ lớn · Mode 3",
@@ -99,7 +100,7 @@ function modeName(mode) {
     6: "Màn hình khóa · Mode 6",
     7: "Lịch âm · Mode 7",
     8: "Màn hình trắng · Mode 8"
-  })[mode] || "Chưa rõ";
+  })[mode] || (Number.isInteger(mode) ? `Mode ${mode} · Chưa xác định` : "Chưa rõ");
 }
 
 function updateDeviceUI() {
@@ -556,7 +557,7 @@ async function syncTime() {
       await writeEpd(new Uint8Array([NRF_CMD.WEEK_START, weekStart]));
       const timestamp = Math.floor(Date.now() / 1000);
       const timezone = Math.round(-new Date().getTimezoneOffset() / 60);
-      const mode = state.mode ?? 1;
+      const mode = Number.isInteger(state.mode) && state.mode >= 0 ? state.mode : 1;
       await writeEpd(new Uint8Array([NRF_CMD.SET_TIME, timestamp >>> 24, timestamp >>> 16, timestamp >>> 8, timestamp, timezone & 0xff, mode]));
     } else {
       const now = new Date();
@@ -640,7 +641,7 @@ function loadImageFile(file) {
   if (!file || !file.type.startsWith("image/")) { toast("Vui lòng chọn đúng tệp hình ảnh.", true); return; }
   const url = URL.createObjectURL(file);
   const image = new Image();
-  image.onload = () => { URL.revokeObjectURL(url); state.image = image; state.rotation = 0; state.imageReady = true; drawImage(); $("upload-button").disabled = false; $("upload-status").textContent = `Đã xử lý ${file.name}`; addLog(`Đã mở ảnh: ${file.name}`); };
+  image.onload = () => { URL.revokeObjectURL(url); state.image = image; resetImageTransform(); state.imageReady = true; drawImage(); $("upload-button").disabled = false; $("upload-status").textContent = `Đã xử lý ${file.name}`; addLog(`Đã mở ảnh: ${file.name}`); };
   image.onerror = () => { URL.revokeObjectURL(url); toast("Không đọc được ảnh này.", true); };
   image.src = url;
 }
@@ -648,14 +649,54 @@ function loadImageFile(file) {
 function drawImage() {
   if (!state.image) return;
   const w = sourceCanvas.width, h = sourceCanvas.height;
-  sourceCtx.save(); sourceCtx.fillStyle = "white"; sourceCtx.fillRect(0,0,w,h); sourceCtx.translate(w/2,h/2); sourceCtx.rotate(state.rotation * Math.PI/180);
+  sourceCtx.save(); sourceCtx.fillStyle = "white"; sourceCtx.fillRect(0,0,w,h); sourceCtx.translate(w/2+state.imageOffsetX,h/2+state.imageOffsetY); sourceCtx.rotate(state.rotation * Math.PI/180);
   const rotated = state.rotation % 180 !== 0;
   const iw = rotated ? state.image.height : state.image.width;
   const ih = rotated ? state.image.width : state.image.height;
-  const scale = state.fit === "cover" ? Math.max(w/iw,h/ih) : Math.min(w/iw,h/ih);
+  const scale = (state.fit === "cover" ? Math.max(w/iw,h/ih) : Math.min(w/iw,h/ih)) * state.imageZoom;
   sourceCtx.drawImage(state.image,-state.image.width*scale/2,-state.image.height*scale/2,state.image.width*scale,state.image.height*scale);
   sourceCtx.restore();
   processPreview();
+}
+
+function resetImageTransform() {
+  state.rotation = 0;
+  state.imageZoom = 1;
+  state.imageOffsetX = 0;
+  state.imageOffsetY = 0;
+  if ($("image-zoom")) { $("image-zoom").value = "100"; $("image-zoom-output").textContent = "100%"; }
+  if ($("image-position-output")) $("image-position-output").textContent = "X 0 · Y 0";
+}
+
+function updateImagePositionOutput() {
+  $("image-position-output").textContent = `X ${Math.round(state.imageOffsetX)} · Y ${Math.round(state.imageOffsetY)}`;
+}
+
+function beginImageDrag(event) {
+  if (!state.image) return;
+  event.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  state.imageDrag = { x: event.clientX, y: event.clientY, scaleX: canvas.width / rect.width, scaleY: canvas.height / rect.height };
+  canvas.classList.add("dragging");
+  canvas.setPointerCapture?.(event.pointerId);
+}
+
+function moveImageDrag(event) {
+  if (!state.imageDrag) return;
+  event.preventDefault();
+  state.imageOffsetX += (event.clientX - state.imageDrag.x) * state.imageDrag.scaleX;
+  state.imageOffsetY += (event.clientY - state.imageDrag.y) * state.imageDrag.scaleY;
+  state.imageDrag.x = event.clientX;
+  state.imageDrag.y = event.clientY;
+  updateImagePositionOutput();
+  drawImage();
+}
+
+function endImageDrag(event) {
+  if (!state.imageDrag) return;
+  state.imageDrag = null;
+  canvas.classList.remove("dragging");
+  canvas.releasePointerCapture?.(event.pointerId);
 }
 
 function processPreview() {
@@ -716,7 +757,7 @@ async function uploadNrfImage() {
   // Model 2 stores bytes column-first, from the rightmost column to the left.
   const planes=[{name:"đen",data:canvasBytesColumnMajor("black"),flag:0x0f,start:0,end:48},{name:"đỏ",data:canvasBytesColumnMajor("red"),flag:0x00,start:48,end:95}];
   for(const plane of planes){const total=Math.ceil(plane.data.length/state.chunkSize);let part=0;for(let offset=0;offset<plane.data.length;offset+=state.chunkSize){const chunk=plane.data.slice(offset,offset+state.chunkSize);const begin=offset===0?0x00:0xf0;await writeEpd(new Uint8Array([NRF_CMD.WRITE_IMAGE,begin|plane.flag,...chunk]));part++;uploadProgress(plane.start+(part/total)*(plane.end-plane.start),`Đang gửi lớp ${plane.name}: ${part}/${total}`);await delay(8);}}
-  uploadProgress(97,"Đang làm mới màn hình…");await writeEpd(new Uint8Array([NRF_CMD.REFRESH]));state.mode=0;updateDeviceUI();
+  uploadProgress(97,"Đang làm mới màn hình…");await writeEpd(new Uint8Array([NRF_CMD.REFRESH]));state.mode=-1;updateDeviceUI();
 }
 async function uploadDaImage() {
   const data=canvasBytesLegacy(),hex=bytesHex(data),step=480,total=Math.ceil(hex.length/step);let part=0;
@@ -1089,7 +1130,7 @@ function useDesignerImage() {
   renderDesigner();
   const image = new Image();
   image.onload = () => {
-    state.image = image; state.rotation = 0; state.fit = "contain"; state.imageReady = true;
+    state.image = image; state.fit = "contain"; resetImageTransform(); state.imageReady = true;
     if (state.designerElements.some((element) => element.type === "qr")) $("dither-mode").value = "nearest";
     document.querySelectorAll("[data-fit]").forEach((button) => button.classList.toggle("active", button.dataset.fit === "contain"));
     drawImage();
@@ -1130,6 +1171,11 @@ function bindEvents() {
   const zone=$("drop-zone");["dragenter","dragover"].forEach((name)=>zone.addEventListener(name,(event)=>{event.preventDefault();zone.classList.add("dragover");}));["dragleave","drop"].forEach((name)=>zone.addEventListener(name,(event)=>{event.preventDefault();zone.classList.remove("dragover");}));zone.addEventListener("drop",(event)=>loadImageFile(event.dataTransfer.files[0]));
   document.querySelectorAll("[data-fit]").forEach((button)=>button.addEventListener("click",()=>{state.fit=button.dataset.fit;document.querySelectorAll("[data-fit]").forEach((b)=>b.classList.toggle("active",b===button));drawImage();}));
   $("rotate-image-button").addEventListener("click",()=>{state.rotation=(state.rotation+90)%360;drawImage();});
+  $("image-zoom").addEventListener("input",()=>{state.imageZoom=Number($("image-zoom").value)/100;$("image-zoom-output").textContent=`${$("image-zoom").value}%`;drawImage();});
+  document.querySelectorAll("[data-image-nudge]").forEach((button)=>button.addEventListener("click",()=>{const [x,y]=button.dataset.imageNudge.split(",").map(Number);state.imageOffsetX+=x;state.imageOffsetY+=y;updateImagePositionOutput();drawImage();}));
+  $("reset-image-position").addEventListener("click",()=>{resetImageTransform();drawImage();});
+  canvas.addEventListener("pointerdown",beginImageDrag);canvas.addEventListener("pointermove",moveImageDrag);canvas.addEventListener("pointerup",endImageDrag);canvas.addEventListener("pointercancel",endImageDrag);
+  $("custom-mode-button").addEventListener("click",()=>{const mode=Number($("custom-mode-number").value);if(!Number.isInteger(mode)||mode<9||mode>255)return toast("Mode mở rộng phải từ 9 đến 255.",true);setNrfMode(mode);});
   ["brightness","contrast"].forEach((id)=>$(id).addEventListener("input",()=>{$(`${id}-output`).textContent=$(id).value;processPreview();}));
   $("dither-mode").addEventListener("change",processPreview);$("upload-button").addEventListener("click",uploadImage);
   document.querySelectorAll("[data-design-template]").forEach((button)=>button.addEventListener("click",()=>{

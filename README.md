@@ -17,7 +17,10 @@ Trang điều khiển Web Bluetooth dành cho màn hình E-Ink 2,13 inch 250×12
 - Đã xác định: mode 1 Lịch dương; mode 2 Đồng hồ; mode 3 Lịch + giờ lớn; mode 4 Lịch + giờ chia ô; mode 5 Lịch + đồng hồ số; mode 7 Lịch âm.
 - Chặn gửi lại mode đang hiển thị vì firmware đổi sang kiểu khác khi nhận cùng mode lần nữa.
 - Bảng thử đầy đủ mode 0–8, gồm mode 6 màn hình khóa và mode 8 màn hình trắng.
+- Mode 0 đã xác minh là màn hình trắng; ảnh truyền riêng không còn bị ghi nhầm là mode 0.
+- Khảo sát mở rộng bằng nút nhanh mode 9–12 hoặc nhập mode bất kỳ từ 9 đến 255.
 - Nhật ký mode ghi tên lệnh, số mode và toàn bộ byte HEX của gói WEEK_START/SET_TIME đã gửi.
+- Ảnh tải lên có thể phóng 25–400%, kéo trực tiếp trong khung xem trước hoặc dịch bằng phím điều hướng.
 - Danh sách Bluetooth được lọc theo service hỗ trợ hoặc tên `NRF_EPD_`/`DLG-CLOCK-` để ẩn bớt thiết bị không liên quan.
 - Không đưa mode 6 (màn hình khóa) và mode 8 (màn hình trắng) vào khu vực sử dụng thông thường.
 - Hiệu chỉnh DA14585 được đặt trong khu vực nâng cao và kiểm tra giá trị HEX.
