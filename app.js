@@ -89,7 +89,17 @@ function showTab(panelId) {
 }
 
 function modeName(mode) {
-  return ({ 0: "Ảnh", 1: "Lịch dương · Mode 1", 2: "Đồng hồ · Mode 2", 3: "Mode 3", 4: "Mode 4", 5: "Mode 5", 7: "Mode 7" })[mode] || "Chưa rõ";
+  return ({
+    0: "Ảnh",
+    1: "Lịch dương · Mode 1",
+    2: "Đồng hồ · Mode 2",
+    3: "Lịch + giờ lớn · Mode 3",
+    4: "Lịch + giờ chia ô · Mode 4",
+    5: "Lịch + đồng hồ số · Mode 5",
+    6: "Màn hình khóa · Mode 6",
+    7: "Lịch âm · Mode 7",
+    8: "Màn hình trắng · Mode 8"
+  })[mode] || "Chưa rõ";
 }
 
 function updateDeviceUI() {
@@ -563,10 +573,19 @@ async function syncTime() {
 
 async function setNrfMode(mode, announce = true) {
   try {
+    if (state.mode === mode) {
+      addLog(`Bỏ qua Mode ${mode}: không gửi lệnh vì mode này đang hiển thị.`, "info");
+      toast(`${modeName(mode)} đang được hiển thị.`);
+      return true;
+    }
     const timestamp = Math.floor(Date.now() / 1000);
     const timezone = Math.round(-new Date().getTimezoneOffset() / 60);
-    await writeEpd(new Uint8Array([NRF_CMD.WEEK_START, Number($("week-start").value)]));
-    await writeEpd(new Uint8Array([NRF_CMD.SET_TIME, timestamp >>> 24, timestamp >>> 16, timestamp >>> 8, timestamp, timezone & 0xff, mode]));
+    const weekPacket = new Uint8Array([NRF_CMD.WEEK_START, Number($("week-start").value)]);
+    const modePacket = new Uint8Array([NRF_CMD.SET_TIME, timestamp >>> 24, timestamp >>> 16, timestamp >>> 8, timestamp, timezone & 0xff, mode]);
+    addLog(`Gửi WEEK_START (0x21): ${bytesHex(weekPacket).match(/.{2}/g).join(" ").toUpperCase()}`, "command");
+    await writeEpd(weekPacket);
+    addLog(`Gửi SET_TIME (0x20) · Mode ${mode}: ${bytesHex(modePacket).match(/.{2}/g).join(" ").toUpperCase()}`, "command");
+    await writeEpd(modePacket);
     state.mode = mode; updateDeviceUI();
     if (announce) { addLog(`Đã chuyển sang ${modeName(mode)}`, "success"); toast(`Đã chọn ${modeName(mode)}.`); }
     return true;
