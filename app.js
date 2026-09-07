@@ -772,7 +772,75 @@ async function uploadDaImage() {
 }
 
 
-const DESIGN_TEMPLATE_NAMES = { clock: "Ảnh đồng hồ", calendar: "Lịch tháng", lunar: "Âm lịch", countdown: "Đếm ngược", blank: "Trang trắng" };
+const DESIGN_TEMPLATE_NAMES = { clock: "Ảnh đồng hồ", calendar: "Lịch tháng", lunar: "Âm lịch", countdown: "Đếm ngược", blank: "Trang trắng", monthClock: "Lịch tháng + giờ", weekClock: "Lịch tuần + giờ" };
+
+// Variables are evaluated by the browser. The existing BLE route sends a bitmap.
+function resolveDesignVariables(text, now = new Date()) {
+  const lunar = solarToLunar(now), pad = (n) => String(n).padStart(2, "0");
+  const stems = ["Giáp", "Ất", "Bính", "Đinh", "Mậu", "Kỷ", "Canh", "Tân", "Nhâm", "Quý"];
+  const branches = ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"];
+  const iso = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  iso.setUTCDate(iso.getUTCDate() + 4 - (iso.getUTCDay() || 7));
+  const week = Math.ceil((((iso - Date.UTC(iso.getUTCFullYear(), 0, 1)) / 86400000) + 1) / 7);
+  const target = $("countdown-date").value;
+  const days = target ? Math.max(0, Math.ceil((new Date(`${target}T00:00:00`) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000)) : 0;
+  const values = { h: pad(now.getHours()), m: pad(now.getMinutes()), d: pad(now.getDate()), M: pad(now.getMonth()+1), y: now.getFullYear(), A: pad(lunar.day), L: pad(lunar.month), D: ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"][now.getDay()], week, canchi: `${stems[(lunar.year+6)%10]} ${branches[(lunar.year+8)%12]}`, days };
+  return String(text).replace(/@([A-Za-z]+)/g, (match, key) => Object.hasOwn(values, key) ? values[key] : match);
+}
+
+function drawReferenceCalendar(dc, now, weekly) {
+  const text = (value, x, y, width, size, options = {}) => designText(dc, resolveDesignVariables(value, now), x, y, width, size, { family: "monospace", ...options });
+  dc.strokeStyle = "#111"; dc.lineWidth = 1;
+  if (weekly) {
+    dc.strokeRect(10, 5, 83, 32);
+    text($("design-title").value, 51, 28, 77, 20, { align: "center" });
+    text($("design-subtitle").value, 244, 17, 145, 10, { align: "right" });
+    text("Tuần @week", 244, 32, 100, 10, { align: "right" });
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay()+6)%7));
+    for (let i=0; i<7; i++) {
+      const day = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate()+i);
+      const lunar = solarToLunar(day), x=3+i*35, selected=day.toDateString()===now.toDateString();
+      dc.fillStyle=selected ? "#111" : "#fff"; dc.fillRect(x,43,33,81); dc.strokeRect(x,43,33,81);
+      const color=selected ? "#fff" : "#111", opts={align:"center",color};
+      text(["T2","T3","T4","T5","T6","T7","CN"][i],x+16,57,30,11,opts);
+      text(String(day.getDate()).padStart(2,"0"),x+16,84,31,23,opts);
+      text(String(day.getMonth()+1).padStart(2,"0"),x+16,99,30,10,opts);
+      text(`${lunar.day}/${lunar.month}`,x+16,119,31,10,opts);
+    }
+  } else {
+    text($("design-title").value,39,26,73,22,{align:"center"});
+    text("Còn @days ngày",39,47,72,9,{align:"center"});
+    dc.beginPath(); dc.moveTo(6,54); dc.lineTo(73,54); dc.stroke();
+    text("@D",39,72,73,13,{align:"center"});
+    text("@d/@M/@y",39,93,73,10,{align:"center"});
+    text($("design-subtitle").value,39,116,73,10,{align:"center"});
+    const start=80, cell=24, first=new Date(now.getFullYear(),now.getMonth(),1);
+    const count=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+    const rows=Math.ceil((first.getDay()+count)/7), rowHeight=108/rows;
+    dc.fillStyle="#111"; dc.fillRect(start,2,168,17);
+    ["CN","T2","T3","T4","T5","T6","T7"].forEach((v,i)=>text(v,start+i*cell+12,14,23,10,{align:"center",color:"#fff"}));
+    for(let i=0;i<rows*7;i++) {
+      const n=i-first.getDay()+1,x=start+(i%7)*cell,y=19+Math.floor(i/7)*rowHeight;
+      const selected=n===now.getDate();
+      dc.fillStyle=selected?"#111":"#fff"; dc.fillRect(x,y,cell,rowHeight); dc.strokeRect(x,y,cell,rowHeight);
+      if(n<1||n>count) continue;
+      const lunar=solarToLunar(new Date(now.getFullYear(),now.getMonth(),n)), opts={align:"center",color:selected?"#fff":"#111"};
+      text(n,x+12,y+rowHeight*.55,23,12,opts);
+      text(lunar.day===1?`${lunar.day}/${lunar.month}`:lunar.day,x+12,y+rowHeight-2,23,7,opts);
+    }
+  }
+}
+
+function installReferenceTemplates() {
+  for (const [key, icon] of [["monthClock","▦"],["weekClock","▥"]]) {
+    const button=document.createElement("button"); button.type="button"; button.className="template-button"; button.dataset.designTemplate=key;
+    const symbol=document.createElement("span"), label=document.createElement("strong"); symbol.textContent=icon; label.textContent=DESIGN_TEMPLATE_NAMES[key];
+    button.append(symbol,label); document.querySelector(".template-grid").append(button);
+  }
+  const hint=document.createElement("p");
+  hint.textContent="Biến trên web: @h:@m · @d/@M/@y · @D · @A/@L (âm lịch) · @week · @canchi · @days. Nhập vào tiêu đề, dòng phụ hoặc đối tượng chữ. Biến được thay trên trình duyệt; truyền Bluetooth hiện vẫn là ảnh tĩnh.";
+  hint.className="designer-note"; $("design-subtitle").closest(".tool-section").append(hint);
+}
 
 function designColor() {
   return document.querySelector('input[name="design-color"]:checked')?.value || "#111111";
@@ -901,8 +969,9 @@ function drawDesignerElement(dc, element, selected) {
     const size = Math.max(7, (element.fontSize || 18) * (element.scale || 1));
     dc.font = `800 ${size}px ${element.family || $("design-font").value || "system-ui"}`;
     dc.textAlign = "center"; dc.textBaseline = "middle"; dc.fillStyle = element.color || designColor();
-    dc.fillText(element.text, 0, 0);
-    element.width = Math.max(18, dc.measureText(element.text).width / (element.scale || 1));
+    const resolved = resolveDesignVariables(element.text);
+    dc.fillText(resolved, 0, 0);
+    element.width = Math.max(18, dc.measureText(resolved).width / (element.scale || 1));
     element.height = Math.max(12, size / (element.scale || 1));
   } else if (element.type === "qr") {
     const modules = element.modules;
@@ -939,14 +1008,16 @@ function renderDesigner() {
   const dc = designCanvas.getContext("2d");
   const now = new Date();
   const accent = designColor();
-  const title = $("design-title").value.trim();
-  const subtitle = $("design-subtitle").value.trim();
+  const title = resolveDesignVariables($("design-title").value.trim(), now);
+  const subtitle = resolveDesignVariables($("design-subtitle").value.trim(), now);
   const fontSize = Math.max(12, Math.min(48, Number($("design-size").value) || 28));
   dc.fillStyle = "#fff"; dc.fillRect(0, 0, 250, 128);
   if (state.designTemplate !== "blank") { dc.strokeStyle = "#111"; dc.lineWidth = 2; dc.strokeRect(1, 1, 248, 126); }
   dc.fillStyle = accent;
 
-  if (state.designTemplate === "clock") {
+  if (state.designTemplate === "monthClock" || state.designTemplate === "weekClock") {
+    drawReferenceCalendar(dc, now, state.designTemplate === "weekClock");
+  } else if (state.designTemplate === "clock") {
     dc.fillRect(0, 0, 250, 21);
     designText(dc, title || "E‑Ink Clock", 8, 15, 190, 10, { color: "#fff", weight: 800 });
     designText(dc, now.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }), 10, 78, 155, Math.max(32, fontSize), { family: "monospace", weight: 800 });
@@ -998,12 +1069,12 @@ function renderDesigner() {
   if (state.designSymbol) designText(dc, state.designSymbol, 237, 119, 25, 18, { color: accent, align: "right" });
   state.designerElements.forEach((element) => drawDesignerElement(dc, element, element.id === state.selectedElementId));
   $("design-template-label").textContent = DESIGN_TEMPLATE_NAMES[state.designTemplate];
-  const isStaticClock = state.designTemplate === "clock";
+  const isStaticClock = ["clock", "monthClock", "weekClock"].includes(state.designTemplate) || /@[A-Za-z]/.test($("design-title").value + $("design-subtitle").value) || state.designerElements.some(e => e.type === "text" && /@[A-Za-z]/.test(e.text));
   const isStaticCountdown = state.designTemplate === "countdown";
   $("static-clock-warning").hidden = !isStaticClock && !isStaticCountdown;
   $("static-clock-warning").querySelector("strong").textContent = isStaticCountdown ? "Đây là ảnh đếm ngược tại thời điểm tạo." : "Đây là ảnh giờ hiện tại, không phải đồng hồ tự chạy.";
   $("static-clock-warning").querySelector("span").textContent = isStaticCountdown ? "Số ngày trên ảnh không tự giảm; thiết bị hiện chưa có chức năng đếm ngược động đã được xác minh." : "Sau khi truyền ảnh, giờ trên ảnh sẽ đứng yên. Hãy chọn “Đồng hồ tự chạy” để dùng chế độ đồng hồ trong firmware.";
-  $("countdown-fields").hidden = !isStaticCountdown;
+  $("countdown-fields").hidden = !isStaticCountdown && state.designTemplate !== "monthClock" && !/@days\b/.test($("design-title").value + $("design-subtitle").value + state.designerElements.filter(e => e.type === "text").map(e => e.text).join(" "));
   $("native-clock-button").hidden = !isStaticClock;
   $("design-use-button").textContent = isStaticClock ? "Dùng ảnh giờ hiện tại" : "Dùng thiết kế này";
   updateSelectionUI();
@@ -1173,6 +1244,11 @@ function bindEvents() {
   $("dither-mode").addEventListener("change",processPreview);$("upload-button").addEventListener("click",uploadImage);
   document.querySelectorAll("[data-design-template]").forEach((button)=>button.addEventListener("click",()=>{
     state.designTemplate=button.dataset.designTemplate;
+    if (state.designTemplate === "monthClock" || state.designTemplate === "weekClock") {
+      $("design-title").value="@h:@m";
+      $("design-subtitle").value=state.designTemplate === "monthClock" ? "AL: @A/@L" : "@y · @canchi";
+    }
+    if (state.designTemplate === "blank") { $("design-title").value=""; $("design-subtitle").value=""; }
     document.querySelectorAll("[data-design-template]").forEach((item)=>item.classList.toggle("active",item===button));
     renderDesigner();
   }));
@@ -1199,10 +1275,11 @@ function bindEvents() {
 }
 
 function initialize() {
+  installReferenceTemplates();
   bindEvents(); clearPreview();
   const nextMonth=new Date();nextMonth.setMonth(nextMonth.getMonth()+1);$("countdown-date").value=nextMonth.toISOString().slice(0,10);
   renderDesigner(); updateDeviceUI();
-  setInterval(()=>{ if(state.designTemplate==="clock"||state.designTemplate==="lunar") renderDesigner(); },30000);
+  setInterval(()=>{ if(!document.hidden && !state.designerDrag) renderDesigner(); },1000);
   const supported="bluetooth" in navigator;
   $("browser-warning").hidden=supported;$("connect-button").disabled=!supported;
   addLog("Ứng dụng đã sẵn sàng.","success");
