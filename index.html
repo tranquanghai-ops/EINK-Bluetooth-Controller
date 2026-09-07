@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#101820">
   <meta name="description" content="Điều khiển màn hình E-Ink 2.13 inch qua Bluetooth, hỗ trợ DA14585 và nRF52.">
   <title>E-Ink Bluetooth Controller</title>
-  <link rel="stylesheet" href="styles.css?v=1.6.0">
+  <link rel="stylesheet" href="styles.css?v=1.6.1">
 </head>
 <body>
   <header class="app-header">
@@ -81,26 +81,9 @@
           <article class="panel-card">
             <div class="card-heading"><div class="card-icon">◫</div><div><h3>Giao diện màn hình</h3><p>Chọn chế độ muốn hiển thị.</p></div></div>
             <div id="nrf-mode-controls" hidden>
-              <div class="display-mode-group"><div class="display-mode-heading"><strong>Lịch</strong><small>Hai loại lịch</small></div><div class="mode-grid nrf-layout-grid"><button class="mode-button" type="button" data-nrf-mode="1"><span>▦</span><strong>Lịch dương</strong><small>Mode 1</small></button><button class="mode-button" type="button" data-nrf-mode="7"><span>☾</span><strong>Lịch âm</strong><small>Mode 7</small></button></div></div>
-              <div class="display-mode-group"><div class="display-mode-heading"><strong>Đồng hồ</strong><small>Chỉ hiển thị giờ</small></div><div class="mode-grid nrf-layout-grid single-mode-grid"><button class="mode-button" type="button" data-nrf-mode="2"><span>◷</span><strong>Đồng hồ</strong><small>Mode 2</small></button></div></div>
-              <div class="display-mode-group"><div class="display-mode-heading"><strong>Lịch + đồng hồ</strong><small>Ba kiểu kết hợp</small></div><div class="mode-grid nrf-layout-grid"><button class="mode-button" type="button" data-nrf-mode="3"><span>▥</span><strong>Lịch + giờ lớn</strong><small>Mode 3</small></button><button class="mode-button" type="button" data-nrf-mode="4"><span>▤</span><strong>Lịch + giờ chia ô</strong><small>Mode 4</small></button><button class="mode-button" type="button" data-nrf-mode="5"><span>▣</span><strong>Lịch + đồng hồ số</strong><small>Mode 5</small></button></div></div>
-              <div class="mode-behavior-note"><strong>Chống nhảy giao diện</strong><small>Nếu mode đang hiển thị được bấm lại, web sẽ không gửi lệnh lần nữa vì firmware có thể tự chuyển sang kiểu khác.</small></div>
-              <details class="all-mode-panel" open>
-                <summary>Thử nghiệm đầy đủ Mode 0–8</summary>
-                <p>Mỗi nút gửi đúng mode ghi trên nút một lần. Mode 6 mở màn hình khóa; Mode 8 có thể làm màn hình trắng.</p>
-                <div class="all-mode-grid">
-                  <button class="mode-test-button mode-test-warning" type="button" data-nrf-mode="0"><strong>Mode 0</strong><small>Màn hình trắng</small></button>
-                  <button class="mode-test-button" type="button" data-nrf-mode="1"><strong>Mode 1</strong><small>Lịch dương</small></button>
-                  <button class="mode-test-button" type="button" data-nrf-mode="2"><strong>Mode 2</strong><small>Đồng hồ</small></button>
-                  <button class="mode-test-button" type="button" data-nrf-mode="3"><strong>Mode 3</strong><small>Lịch + giờ lớn</small></button>
-                  <button class="mode-test-button" type="button" data-nrf-mode="4"><strong>Mode 4</strong><small>Lịch + giờ chia ô</small></button>
-                  <button class="mode-test-button" type="button" data-nrf-mode="5"><strong>Mode 5</strong><small>Lịch + đồng hồ số</small></button>
-                  <button class="mode-test-button mode-test-danger" type="button" data-nrf-mode="6"><strong>Mode 6</strong><small>Màn hình khóa</small></button>
-                  <button class="mode-test-button" type="button" data-nrf-mode="7"><strong>Mode 7</strong><small>Lịch âm</small></button>
-                  <button class="mode-test-button mode-test-warning" type="button" data-nrf-mode="8"><strong>Mode 8</strong><small>Màn hình trắng</small></button>
-                </div>
-                <div class="extended-mode"><div><strong>Khảo sát Mode 9–255</strong><small>Dùng các nút nhanh hoặc nhập một mode bất kỳ.</small></div><div class="extended-mode-quick"><button class="button button-secondary" type="button" data-nrf-mode="9">Mode 9</button><button class="button button-secondary" type="button" data-nrf-mode="10">Mode 10</button><button class="button button-secondary" type="button" data-nrf-mode="11">Mode 11</button><button class="button button-secondary" type="button" data-nrf-mode="12">Mode 12</button></div><div class="extended-mode-input"><input id="custom-mode-number" type="number" min="9" max="255" value="13" aria-label="Số mode mở rộng"><button class="button button-primary" id="custom-mode-button" type="button">Gửi mode</button></div></div>
-              </details>
+              <div class="display-mode-group"><div class="display-mode-heading"><strong>Lịch</strong><small>Hai loại lịch</small></div><div class="mode-grid nrf-layout-grid"><button class="mode-button" type="button" data-nrf-mode="1"><span>▦</span><strong>Lịch dương</strong><small>Lịch tháng dương</small></button><button class="mode-button" type="button" data-nrf-mode="7"><span>☾</span><strong>Lịch âm</strong><small>Lịch tháng kèm ngày âm</small></button></div></div>
+              <div class="display-mode-group"><div class="display-mode-heading"><strong>Đồng hồ</strong><small>Chỉ hiển thị giờ</small></div><div class="mode-grid nrf-layout-grid single-mode-grid"><button class="mode-button" type="button" data-nrf-mode="2"><span>◷</span><strong>Đồng hồ</strong><small>Mặt đồng hồ toàn màn hình</small></button></div></div>
+              <div class="display-mode-group"><div class="display-mode-heading"><strong>Lịch + đồng hồ</strong><small>Ba kiểu kết hợp</small></div><div class="mode-grid nrf-layout-grid"><button class="mode-button" type="button" data-nrf-mode="3"><span>▥</span><strong>Lịch + giờ lớn</strong><small>Lịch trái, giờ lớn bên phải</small></button><button class="mode-button" type="button" data-nrf-mode="4"><span>▤</span><strong>Lịch + giờ chia ô</strong><small>Ngày và giờ chia thành từng ô</small></button><button class="mode-button" type="button" data-nrf-mode="5"><span>▣</span><strong>Lịch + đồng hồ số</strong><small>Lịch tháng kèm đồng hồ số</small></button></div></div>
               <button class="mode-button open-image image-mode-button" type="button"><span>▧</span><strong>Ảnh riêng</strong><small>Tải ảnh 250×128</small></button>
             </div>
             <div class="mode-grid" id="da-mode-controls" hidden>
@@ -118,7 +101,6 @@
                 <select id="week-start"><option value="1">Thứ Hai</option><option value="0">Chủ nhật</option></select>
               </label>
               <button class="setting-row setting-action" id="refresh-button" type="button"><span><strong>Làm mới màn hình</strong><small>Gửi lại lệnh refresh phù hợp</small></span><b>↻</b></button>
-              <div class="compatibility-note da-only"><strong>Firmware Legacy giới hạn</strong><small>Các lệnh đổi màu, đảo màu và xoay E3/E4/E5 không được log thiết bị xác nhận nên đã chuyển xuống mục thử nghiệm.</small></div>
             </div>
           </article>
         </div>
@@ -129,15 +111,6 @@
           </button>
           <div class="advanced-content" id="advanced-content" hidden>
             <div class="advanced-grid">
-              <div class="advanced-section experimental-section">
-                <h4>Lệnh thử nghiệm E3 / E4 / E5</h4>
-                <p>Chỉ thử khi bạn chấp nhận thiết bị có thể không phản hồi. Các lệnh này không ghi firmware.</p>
-                <div class="experimental-actions">
-                  <button class="button button-ghost" id="toggle-color-button" type="button">E4 · Đổi màu</button>
-                  <button class="button button-ghost" id="invert-button" type="button">E3 · Đảo màu</button>
-                  <button class="button button-ghost" id="rotate-device-button" type="button">E5 · Xoay 180°</button>
-                </div>
-              </div>
               <div class="advanced-section">
                 <h4>Hiệu chỉnh làm mới cục bộ</h4>
                 <p>Chỉ thay đổi khi màu đỏ hoặc đen quá nhạt. Mỗi lần nên điều chỉnh một mức và kiểm tra lại.</p>
@@ -357,11 +330,11 @@
 
   <footer class="app-footer">
     <span>Phát triển bởi <strong>ThS. Trần Quang Hải</strong></span>
-    <span>Phiên bản Web 1.6.0</span>
+    <span>Phiên bản Web 1.6.1</span>
   </footer>
 
   <div class="toast-region" id="toast-region" aria-live="polite"></div>
-  <script src="vendor/qrcode.js?v=1.6.0"></script>
-  <script src="app.js?v=1.6.0"></script>
+  <script src="vendor/qrcode.js?v=1.6.1"></script>
+  <script src="app.js?v=1.6.1"></script>
 </body>
 </html>

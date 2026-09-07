@@ -91,15 +91,15 @@ function showTab(panelId) {
 function modeName(mode) {
   return ({
     [-1]: "Ảnh riêng",
-    0: "Màn hình trắng · Mode 0",
-    1: "Lịch dương · Mode 1",
-    2: "Đồng hồ · Mode 2",
-    3: "Lịch + giờ lớn · Mode 3",
-    4: "Lịch + giờ chia ô · Mode 4",
-    5: "Lịch + đồng hồ số · Mode 5",
-    6: "Màn hình khóa · Mode 6",
-    7: "Lịch âm · Mode 7",
-    8: "Màn hình trắng · Mode 8"
+    0: "Màn hình trắng",
+    1: "Lịch dương",
+    2: "Đồng hồ",
+    3: "Lịch + giờ lớn",
+    4: "Lịch + giờ chia ô",
+    5: "Lịch + đồng hồ số",
+    6: "Màn hình khóa",
+    7: "Lịch âm",
+    8: "Màn hình trắng"
   })[mode] || (Number.isInteger(mode) ? `Mode ${mode} · Chưa xác định` : "Chưa rõ");
 }
 
@@ -943,7 +943,7 @@ function renderDesigner() {
   const subtitle = $("design-subtitle").value.trim();
   const fontSize = Math.max(12, Math.min(48, Number($("design-size").value) || 28));
   dc.fillStyle = "#fff"; dc.fillRect(0, 0, 250, 128);
-  dc.strokeStyle = "#111"; dc.lineWidth = 2; dc.strokeRect(1, 1, 248, 126);
+  if (state.designTemplate !== "blank") { dc.strokeStyle = "#111"; dc.lineWidth = 2; dc.strokeRect(1, 1, 248, 126); }
   dc.fillStyle = accent;
 
   if (state.designTemplate === "clock") {
@@ -993,9 +993,6 @@ function renderDesigner() {
     designText(dc, label, 185, 61, 90, 11, { color: "#111", align: "center", weight: 800 });
     designText(dc, target.toLocaleDateString("vi-VN"), 185, 80, 90, 13, { color: accent, align: "center", weight: 800 });
     designText(dc, subtitle, 125, 117, 226, 9, { align: "center", weight: 500 });
-  } else if (state.designTemplate === "blank") {
-    designText(dc, title, 125, 22, 225, 12, { color: accent, align: "center", weight: 800 });
-    designText(dc, subtitle, 125, 119, 225, 9, { align: "center", weight: 500 });
   }
 
   if (state.designSymbol) designText(dc, state.designSymbol, 237, 119, 25, 18, { color: accent, align: "right" });
@@ -1005,7 +1002,7 @@ function renderDesigner() {
   const isStaticCountdown = state.designTemplate === "countdown";
   $("static-clock-warning").hidden = !isStaticClock && !isStaticCountdown;
   $("static-clock-warning").querySelector("strong").textContent = isStaticCountdown ? "Đây là ảnh đếm ngược tại thời điểm tạo." : "Đây là ảnh giờ hiện tại, không phải đồng hồ tự chạy.";
-  $("static-clock-warning").querySelector("span").textContent = isStaticCountdown ? "Số ngày trên ảnh không tự giảm. Khu vực khảo sát mode sẽ giúp kiểm tra firmware có bộ đếm động ẩn hay không." : "Sau khi truyền ảnh, giờ trên ảnh sẽ đứng yên. Hãy chọn “Đồng hồ tự chạy” để dùng chế độ đồng hồ trong firmware.";
+  $("static-clock-warning").querySelector("span").textContent = isStaticCountdown ? "Số ngày trên ảnh không tự giảm; thiết bị hiện chưa có chức năng đếm ngược động đã được xác minh." : "Sau khi truyền ảnh, giờ trên ảnh sẽ đứng yên. Hãy chọn “Đồng hồ tự chạy” để dùng chế độ đồng hồ trong firmware.";
   $("countdown-fields").hidden = !isStaticCountdown;
   $("native-clock-button").hidden = !isStaticClock;
   $("design-use-button").textContent = isStaticClock ? "Dùng ảnh giờ hiện tại" : "Dùng thiết kế này";
@@ -1149,9 +1146,6 @@ function bindEvents() {
   $("disconnect-button").addEventListener("click",disconnectDevice);
   $("sync-time-button").addEventListener("click",syncTime);
   $("refresh-button").addEventListener("click",refreshScreen);
-  $("toggle-color-button").addEventListener("click",()=>writeSerialHex("e4",true).catch(commandError));
-  $("invert-button").addEventListener("click",()=>writeSerialHex("e3").catch(commandError));
-  $("rotate-device-button").addEventListener("click",()=>writeSerialHex("e5").catch(commandError));
   document.querySelectorAll("[data-nrf-mode]").forEach((button)=>button.addEventListener("click",()=>setNrfMode(Number(button.dataset.nrfMode))));
   document.querySelectorAll("[data-da-command]").forEach((button)=>button.addEventListener("click",()=>writeSerialHex(button.dataset.daCommand,true).catch(commandError)));
   document.querySelectorAll("[data-da-direct]").forEach((button)=>button.addEventListener("click",()=>writeSerialHex(button.dataset.daDirect).catch(commandError)));
@@ -1175,7 +1169,6 @@ function bindEvents() {
   document.querySelectorAll("[data-image-nudge]").forEach((button)=>button.addEventListener("click",()=>{const [x,y]=button.dataset.imageNudge.split(",").map(Number);state.imageOffsetX+=x;state.imageOffsetY+=y;updateImagePositionOutput();drawImage();}));
   $("reset-image-position").addEventListener("click",()=>{resetImageTransform();drawImage();});
   canvas.addEventListener("pointerdown",beginImageDrag);canvas.addEventListener("pointermove",moveImageDrag);canvas.addEventListener("pointerup",endImageDrag);canvas.addEventListener("pointercancel",endImageDrag);
-  $("custom-mode-button").addEventListener("click",()=>{const mode=Number($("custom-mode-number").value);if(!Number.isInteger(mode)||mode<9||mode>255)return toast("Mode mở rộng phải từ 9 đến 255.",true);setNrfMode(mode);});
   ["brightness","contrast"].forEach((id)=>$(id).addEventListener("input",()=>{$(`${id}-output`).textContent=$(id).value;processPreview();}));
   $("dither-mode").addEventListener("change",processPreview);$("upload-button").addEventListener("click",uploadImage);
   document.querySelectorAll("[data-design-template]").forEach((button)=>button.addEventListener("click",()=>{

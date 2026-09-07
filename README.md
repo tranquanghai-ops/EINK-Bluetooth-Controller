@@ -16,9 +16,6 @@ Trang điều khiển Web Bluetooth dành cho màn hình E-Ink 2,13 inch 250×12
 - Mỗi nút nRF52 gửi trực tiếp đúng một giá trị mode đúng một lần, không đếm vòng và không tự gửi lặp.
 - Đã xác định: mode 1 Lịch dương; mode 2 Đồng hồ; mode 3 Lịch + giờ lớn; mode 4 Lịch + giờ chia ô; mode 5 Lịch + đồng hồ số; mode 7 Lịch âm.
 - Chặn gửi lại mode đang hiển thị vì firmware đổi sang kiểu khác khi nhận cùng mode lần nữa.
-- Bảng thử đầy đủ mode 0–8, gồm mode 6 màn hình khóa và mode 8 màn hình trắng.
-- Mode 0 đã xác minh là màn hình trắng; ảnh truyền riêng không còn bị ghi nhầm là mode 0.
-- Khảo sát mở rộng bằng nút nhanh mode 9–12 hoặc nhập mode bất kỳ từ 9 đến 255.
 - Nhật ký mode ghi tên lệnh, số mode và toàn bộ byte HEX của gói WEEK_START/SET_TIME đã gửi.
 - Ảnh tải lên có thể phóng 25–400%, kéo trực tiếp trong khung xem trước hoặc dịch bằng phím điều hướng.
 - Danh sách Bluetooth được lọc theo service hỗ trợ hoặc tên `NRF_EPD_`/`DLG-CLOCK-` để ẩn bớt thiết bị không liên quan.
@@ -28,7 +25,6 @@ Trang điều khiển Web Bluetooth dành cho màn hình E-Ink 2,13 inch 250×12
 - Tạo dấu vân tay thiết bị, từ khóa tìm firmware và xuất kèm trong tệp JSON chẩn đoán.
 - Nhật ký kết nối kèm danh sách GATT service/characteristic và xuất tệp JSON chẩn đoán.
 - Mã hóa ảnh DA14585 Legacy 250×128 theo đúng thứ tự cột và quy ước điểm ảnh của công cụ gốc.
-- Các lệnh E3/E4/E5 chưa được firmware xác nhận được đưa vào khu vực thử nghiệm.
 - Tự phát hiện dịch vụ Telink OTA 0x221F/0x331F; chỉ khi có dịch vụ này mới cho kiểm tra đọc và sao lưu vùng firmware 0x20000–0x3FFFF.
 - Không tải ảnh hoặc firmware của người dùng lên máy chủ.
 
